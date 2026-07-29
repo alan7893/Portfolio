@@ -37,18 +37,14 @@ fi
 SSH_CMD="ssh -o StrictHostKeyChecking=no -i $KEY_FILE"
 SCP_CMD="scp -o StrictHostKeyChecking=no -i $KEY_FILE"
 
-echo "Building production bundle..."
-npm run build
-
 echo "Packing deployment..."
 tar czf /tmp/lumen-deploy.tar.gz \
   --exclude='node_modules' \
   --exclude='.git' \
-  --exclude='.next/cache' \
+  --exclude='.next' \
   --exclude='data/store.json' \
   --exclude='data/uploads/*' \
   --exclude='public/uploads/*' \
-  --exclude='!public/uploads/.gitkeep' \
   .
 
 echo "Uploading to $REMOTE_HOST..."
@@ -61,7 +57,8 @@ cd $REMOTE_DIR
 tar xzf /tmp/lumen-deploy.tar.gz
 rm /tmp/lumen-deploy.tar.gz
 mkdir -p data/uploads public/uploads
-npm ci --omit=dev 2>&1 | tail -5
+npm ci
+npm run build
 pm2 restart lumen || pm2 start ecosystem.config.cjs
 pm2 save
 sleep 3
