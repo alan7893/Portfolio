@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import type { AppStore, TrackRecord } from "@/lib/types";
 import { UserSwitcher } from "@/components/UserSwitcher";
+import { OverviewPanel } from "@/components/OverviewPanel";
 import { PhotoUploader } from "@/components/PhotoUploader";
 import { TrackRecordPanel } from "@/components/TrackRecordPanel";
 import { ReportPanel } from "@/components/ReportPanel";
@@ -14,7 +15,9 @@ type Props = {
 export function MemoryApp({ initialStore }: Props) {
   const [store, setStore] = useState<AppStore>(initialStore);
   const [error, setError] = useState<string | null>(null);
-  const [section, setSection] = useState<"photos" | "records" | "report">("photos");
+  const [section, setSection] = useState<"overview" | "photos" | "records" | "report">(
+    "overview",
+  );
   const [pending, startTransition] = useTransition();
 
   const activePerson = useMemo(
@@ -165,6 +168,7 @@ export function MemoryApp({ initialStore }: Props) {
           <nav className="animate-rise-delay flex flex-wrap gap-2">
             {(
               [
+                ["overview", "Overview"],
                 ["photos", "Photos"],
                 ["records", "Track record"],
                 ["report", "Portfolio report"],
@@ -186,6 +190,15 @@ export function MemoryApp({ initialStore }: Props) {
           </nav>
 
           <main className="animate-rise-delay-2">
+            {section === "overview" ? (
+              <OverviewPanel
+                person={activePerson}
+                photos={photos}
+                records={records}
+                onGoToPhotos={() => setSection("photos")}
+                onGoToRecords={() => setSection("records")}
+              />
+            ) : null}
             {section === "photos" ? (
               <PhotoUploader
                 person={activePerson}
