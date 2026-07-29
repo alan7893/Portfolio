@@ -1,5 +1,6 @@
 import sharp from "sharp";
 import type { PhotoAnalysis } from "./types";
+import { geminiGenerate, mimeFromFilename } from "./gemini";
 
 function moodFromColors(colors: string[]): string {
   const joined = colors.join(" ").toLowerCase();
@@ -59,17 +60,54 @@ async function localAnalyze(buffer: Buffer, filename: string): Promise<PhotoAnal
   };
 }
 
+async function geminiAnalyze(buffer: Buffer, filename: string): Promise<PhotoAnalysis | null> {
+  // Keep payloads token-safe: resize large images before sending.
+  const compact = await sharp(buffer)
+    .rotate()
+    .resize(1280, 1280, { fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: 82 })
+    .toBuffer();
+
+  const text = await geminiGenerate({
+    system:
+      "You analyze personal memory photos for a portfolio report. Return JSON only with keys: summary, tags (string[]), mood, setting, peopleVisible, colors (hex string[]), sparklingMoment.",
+    json: true,
+    temperature: 0.35,
+    maxOutputTokens: 1024,
+    parts: [
+      {
+        text: `Filename: ${filename}. Describe the photo content for a warm, precise memory system. Focus on activity, emotion, setting, and what makes this a sparkling hour.`,
+      },
+      {
+        inline_data: {
+          mime_type: "image/jpeg",
+          data: compact.toString("base64"),
+        },
+      },
+    ],
+  });
+
+  if (!text) return null;
+
+  const parsed = JSON.parse(text) as Partial<PhotoAnalysis>;
+  return {
+    summary: parsed.summary || "Memorable captured moment",
+    tags: Array.isArray(parsed.tags) ? parsed.tags.map(String).slice(0, 8) : [],
+    mood: parsed.mood || "warm",
+    setting: parsed.setting || "unspecified",
+    peopleVisible: parsed.peopleVisible || "unspecified",
+    colors: Array.isArray(parsed.colors) ? parsed.colors.map(String).slice(0, 5) : [],
+    sparklingMoment: parsed.sparklingMoment || parsed.summary || "A standout frame",
+    source: "gemini",
+  };
+}
+
 async function openaiAnalyze(buffer: Buffer, filename: string): Promise<PhotoAnalysis | null> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return null;
 
   const base64 = buffer.toString("base64");
-  const mime =
-    filename.toLowerCase().endsWith(".png")
-      ? "image/png"
-      : filename.toLowerCase().endsWith(".webp")
-        ? "image/webp"
-        : "image/jpeg";
+  const mime = mimeFromFilename(filename);
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -130,10 +168,18 @@ async function openaiAnalyze(buffer: Buffer, filename: string): Promise<PhotoAna
 
 export async function analyzePhoto(buffer: Buffer, filename: string): Promise<PhotoAnalysis> {
   try {
-    const ai = await openaiAnalyze(buffer, filename);
-    if (ai) return ai;
+    const gemini = await geminiAnalyze(buffer, filename);
+    if (gemini) return gemini;
   } catch (error) {
-    console.error("Vision AI error, falling back to local analysis", error);
+    console.error("Gemini vision error, trying fallbacks", error);
   }
+
+  try {
+    const openai = await openaiAnalyze(buffer, filename);
+    if (openai) return openai;
+  } catch (error) {
+    console.error("OpenAI vision error, falling back to local analysis", error);
+  }
+
   return localAnalyze(buffer, filename);
 }

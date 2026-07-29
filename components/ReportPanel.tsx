@@ -27,7 +27,8 @@ export function ReportPanel({
           <h2 className="font-display mt-2 text-3xl text-foam">Portrait of {person.name}</h2>
           <p className="mt-3 max-w-xl text-foam/65">
             Weave {photoCount} photo{photoCount === 1 ? "" : "s"} and {recordCount} track record
-            {recordCount === 1 ? "" : "s"} into activity, positive feedback, and sparkling hours.
+            {recordCount === 1 ? "" : "s"} into a 4–8 page AI portfolio with activity, positive
+            feedback, and sparkling hours.
           </p>
         </div>
         <button
@@ -98,8 +99,19 @@ export function ReportPanel({
           </article>
 
           <article className="panel rounded-[1.5rem] p-6 lg:col-span-3">
-            <p className="text-xs uppercase tracking-[0.18em] text-foam/45">Narrative</p>
-            <p className="mt-3 max-w-4xl text-lg leading-relaxed text-foam/80">{report.narrative}</p>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-xs uppercase tracking-[0.18em] text-foam/45">Narrative</p>
+              <p className="text-xs text-foam/40">
+                {(report.source || "local") === "gemini"
+                  ? `Gemini · ${report.model || "gemini-2.5-flash"}`
+                  : "Local draft"}{" "}
+                · ~{report.pagesEstimate || 1} page
+                {(report.pagesEstimate || 1) === 1 ? "" : "s"}
+              </p>
+            </div>
+            <div className="mt-4 max-w-4xl space-y-4 text-base leading-relaxed text-foam/80 whitespace-pre-wrap">
+              {report.narrative}
+            </div>
             <p className="mt-4 text-xs text-foam/35">
               Generated {new Date(report.generatedAt).toLocaleString()}
             </p>

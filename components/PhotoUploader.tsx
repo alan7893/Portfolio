@@ -87,7 +87,11 @@ export function PhotoUploader({ person, photos, onUpload, busy }: Props) {
                       </span>
                     ))}
                     <span className="rounded-full border border-[var(--line)] px-2 py-0.5 text-[11px] text-foam/40">
-                      {photo.analysis.source === "openai" ? "AI vision" : "local vision"}
+                      {photo.analysis.source === "gemini"
+                        ? "Gemini vision"
+                        : photo.analysis.source === "openai"
+                          ? "AI vision"
+                          : "local vision"}
                     </span>
                   </div>
                 </div>

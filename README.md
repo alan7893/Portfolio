@@ -18,9 +18,21 @@ Open [http://localhost:3000](http://localhost:3000).
 - **Track records** — dated notes with category + sparkle intensity
 - **Portfolio report** — activity themes, strengths, and pinpointed sparkling hours
 
-## Optional AI vision
+## Optional AI (Gemini)
 
-Copy `.env.example` to `.env.local` and set `OPENAI_API_KEY` for richer photo understanding.
+Copy `.env.example` to `.env.local` and set:
+
+```bash
+GEMINI_API_KEY=your_key_here
+GEMINI_MODEL=gemini-2.5-flash
+```
+
+With Gemini configured:
+- Uploaded photos are analyzed by **Gemini 2.5 Flash**
+- Portfolio reports are AI-written in a **4–8 page** narrative style
+- Token-safe mode uses stored summaries (top 12 photos + top 20 records), not every raw image on each report
+
+Without a key, Lumen still works with local analysis + rule-based reports.
 
 ## Scripts
 

@@ -1,5 +1,6 @@
 import { format, parseISO } from "date-fns";
 import type { Person, PhotoMemory, PortfolioReport, TrackRecord } from "./types";
+import { geminiGenerate, isGeminiConfigured } from "./gemini";
 
 const CATEGORY_LABEL: Record<TrackRecord["category"], string> = {
   work: "work craft",
@@ -8,6 +9,10 @@ const CATEGORY_LABEL: Record<TrackRecord["category"], string> = {
   milestone: "milestones",
   other: "life texture",
 };
+
+/** Token-safe caps so reports stay cheap even with large archives. */
+const MAX_PHOTOS_FOR_REPORT = 12;
+const MAX_RECORDS_FOR_REPORT = 20;
 
 function topThemes(records: TrackRecord[], photos: PhotoMemory[]): string[] {
   const counts = new Map<string, number>();
@@ -35,17 +40,36 @@ function cadenceLabel(records: TrackRecord[], photos: PhotoMemory[]): string {
   return "Rich chronicle — dense with lived detail";
 }
 
-export function generateReport(
+function selectTokenSafeInputs(photos: PhotoMemory[], records: TrackRecord[]) {
+  const selectedRecords = [...records]
+    .sort((a, b) => b.highlight - a.highlight || b.date.localeCompare(a.date))
+    .slice(0, MAX_RECORDS_FOR_REPORT);
+
+  const selectedPhotos = [...photos]
+    .sort((a, b) => {
+      const aScore = a.analysis.source === "gemini" || a.analysis.source === "openai" ? 2 : 1;
+      const bScore = b.analysis.source === "gemini" || b.analysis.source === "openai" ? 2 : 1;
+      return bScore - aScore || b.uploadedAt.localeCompare(a.uploadedAt);
+    })
+    .slice(0, MAX_PHOTOS_FOR_REPORT);
+
+  return { selectedPhotos, selectedRecords };
+}
+
+function estimatePages(text: string): number {
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.round(words / 450));
+}
+
+function buildLocalReport(
   person: Person,
   photos: PhotoMemory[],
   records: TrackRecord[],
 ): PortfolioReport {
-  const themes = topThemes(records, photos);
-  const sortedRecords = [...records].sort((a, b) => b.highlight - a.highlight || b.date.localeCompare(a.date));
-  const topRecords = sortedRecords.slice(0, 3);
-  const topPhotos = [...photos]
-    .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt))
-    .slice(0, 3);
+  const { selectedPhotos, selectedRecords } = selectTokenSafeInputs(photos, records);
+  const themes = topThemes(selectedRecords, selectedPhotos);
+  const topRecords = selectedRecords.slice(0, 3);
+  const topPhotos = selectedPhotos.slice(0, 3);
 
   const strengths = [
     ...topRecords.map((r) => `${r.title}: ${r.notes.slice(0, 120)}${r.notes.length > 120 ? "…" : ""}`),
@@ -87,6 +111,8 @@ export function generateReport(
       ? `${person.name} already has high-sparkle moments on file — keep capturing the conditions that produce them.`
       : `Protect time for reflection. Even small notes compound into a clear portrait of ${person.name}'s strengths.`;
 
+  const narrative = buildNarrative(person, themes, topRecords[0], topPhotos[0]);
+
   return {
     personId: person.id,
     generatedAt: new Date().toISOString(),
@@ -115,8 +141,131 @@ export function generateReport(
               },
             ],
     },
-    narrative: buildNarrative(person, themes, topRecords[0], topPhotos[0]),
+    narrative,
+    source: "local",
+    pagesEstimate: estimatePages(narrative),
+    model: null,
   };
+}
+
+async function buildGeminiReport(
+  person: Person,
+  photos: PhotoMemory[],
+  records: TrackRecord[],
+): Promise<PortfolioReport | null> {
+  if (!isGeminiConfigured()) return null;
+
+  const { selectedPhotos, selectedRecords } = selectTokenSafeInputs(photos, records);
+  const themes = topThemes(selectedRecords, selectedPhotos);
+
+  const photoDigest = selectedPhotos
+    .map(
+      (p, i) =>
+        `${i + 1}. [${safeDate(p.uploadedAt)}] ${p.analysis.summary} | mood: ${p.analysis.mood} | setting: ${p.analysis.setting} | sparkling: ${p.analysis.sparklingMoment} | tags: ${p.analysis.tags.join(", ")}`,
+    )
+    .join("\n");
+
+  const recordDigest = selectedRecords
+    .map(
+      (r, i) =>
+        `${i + 1}. [${r.date}] ${r.title} (${r.category}, sparkle ${r.highlight}/5): ${r.notes || "(no notes)"}`,
+    )
+    .join("\n");
+
+  const prompt = `Create a warm, specific personal portfolio report for ${person.name}${person.role ? ` (${person.role})` : ""}.
+
+Archive size: ${photos.length} photos, ${records.length} track records.
+Token-safe digest used for writing: ${selectedPhotos.length} photo summaries + ${selectedRecords.length} records.
+Suggested themes: ${themes.join(", ") || "emerging identity"}.
+
+PHOTO SUMMARIES:
+${photoDigest || "(none yet)"}
+
+TRACK RECORDS:
+${recordDigest || "(none yet)"}
+
+Return JSON with this exact shape:
+{
+  "activity": { "headline": string, "summary": string, "themes": string[], "cadence": string },
+  "positiveFeedback": { "headline": string, "strengths": string[], "encouragement": string },
+  "sparklingHours": { "headline": string, "moments": [{"title": string, "when": string, "why": string, "source": "photo"|"record"}] },
+  "narrative": string,
+  "pagesEstimate": number
+}
+
+Narrative requirements:
+- Write a polished 4 to 8 page style narrative (about 1800-3600 words).
+- Use short titled sections inside the narrative string, separated by blank lines.
+- Include sections covering: opening portrait, activity arc, strengths, sparkling hours, growth trajectory, and closing encouragement.
+- Stay grounded in the provided evidence. Do not invent facts not supported by the digests.
+- Keep tone warm, concrete, and portfolio-ready.`;
+
+  const text = await geminiGenerate({
+    system:
+      "You are Lumen, a memory-portfolio writer. Produce accurate, encouraging portfolio reports from photo summaries and track records. Output JSON only.",
+    json: true,
+    temperature: 0.55,
+    maxOutputTokens: 8192,
+    parts: [{ text: prompt }],
+  });
+
+  if (!text) return null;
+
+  const parsed = JSON.parse(text) as Partial<PortfolioReport> & {
+    pagesEstimate?: number;
+  };
+
+  const narrative = typeof parsed.narrative === "string" ? parsed.narrative : "";
+  if (!narrative) return null;
+
+  return {
+    personId: person.id,
+    generatedAt: new Date().toISOString(),
+    activity: {
+      headline: parsed.activity?.headline || "Activity in motion",
+      summary: parsed.activity?.summary || cadenceLabel(records, photos),
+      themes: parsed.activity?.themes?.length ? parsed.activity.themes : themes,
+      cadence: parsed.activity?.cadence || cadenceLabel(records, photos),
+    },
+    positiveFeedback: {
+      headline: parsed.positiveFeedback?.headline || "What shines",
+      strengths: parsed.positiveFeedback?.strengths?.length
+        ? parsed.positiveFeedback.strengths
+        : ["Evidence of intentional growth"],
+      encouragement:
+        parsed.positiveFeedback?.encouragement ||
+        `Keep recording the moments that make ${person.name} distinct.`,
+    },
+    sparklingHours: {
+      headline: parsed.sparklingHours?.headline || "Sparkling hours",
+      moments: parsed.sparklingHours?.moments?.length
+        ? parsed.sparklingHours.moments.map((m) => ({
+            title: m.title,
+            when: m.when,
+            why: m.why,
+            source: m.source === "photo" ? "photo" : "record",
+          }))
+        : [],
+    },
+    narrative,
+    source: "gemini",
+    pagesEstimate: parsed.pagesEstimate || estimatePages(narrative),
+    model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+  };
+}
+
+export async function generateReport(
+  person: Person,
+  photos: PhotoMemory[],
+  records: TrackRecord[],
+): Promise<PortfolioReport> {
+  try {
+    const aiReport = await buildGeminiReport(person, photos, records);
+    if (aiReport) return aiReport;
+  } catch (error) {
+    console.error("Gemini report generation failed, using local report", error);
+  }
+  return buildLocalReport(person, photos, records);
 }
 
 function safeDate(value: string): string {

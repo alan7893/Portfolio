@@ -23,7 +23,7 @@ export type PhotoAnalysis = {
   peopleVisible: string;
   colors: string[];
   sparklingMoment: string;
-  source: "openai" | "local";
+  source: "gemini" | "openai" | "local";
 };
 
 export type TrackRecord = {
@@ -61,6 +61,9 @@ export type PortfolioReport = {
     }>;
   };
   narrative: string;
+  source: "gemini" | "local";
+  pagesEstimate: number;
+  model: string | null;
 };
 
 export type AppStore = {

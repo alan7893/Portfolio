@@ -22,7 +22,7 @@ export async function POST(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "Person not found" }, { status: 404 });
   }
 
-  const report = generateReport(bundle.person, bundle.photos, bundle.records);
+  const report = await generateReport(bundle.person, bundle.photos, bundle.records);
   await saveReport(report);
   return NextResponse.json(report, { status: 201 });
 }
