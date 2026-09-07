@@ -1,30 +1,35 @@
 import { buildAiMessages, type AiKind, type AiProvider, type ChildSummary } from "@/lib/ai-prompt";
 import type { Locale } from "@/lib/i18n";
 
+function runtimeEnv(name: string): string {
+  // Bracket access so Next.js does not inline these at build time.
+  return (process.env[name] ?? "").trim();
+}
+
 const GEMINI_OPENAI_URL =
   "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
 const GEMINI_NATIVE_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
 
-const GEMINI_MODELS = [
-  process.env.GEMINI_MODEL,
-  "gemini-2.0-flash",
-  "gemini-2.5-flash",
-  "gemini-flash-latest",
-  "gemini-1.5-flash",
-].filter((m): m is string => Boolean(m));
+function geminiModels(): string[] {
+  return [
+    runtimeEnv("GEMINI_MODEL"),
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-flash-latest",
+    "gemini-2.5-flash",
+  ].filter((m, i, arr): m is string => Boolean(m) && arr.indexOf(m) === i);
+}
 
-const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || "deepseek-chat";
+const DEEPSEEK_MODEL = runtimeEnv("DEEPSEEK_MODEL") || "deepseek-chat";
 
 export function getAiKeys() {
-  const gemini = (
-    process.env.GEMINI_API_KEY ||
-    process.env.GEMINI_LUMEN_API_KEY ||
-    process.env.GOOGLE_API_KEY ||
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
-    ""
-  ).trim();
-  const deepseek = (process.env.DEEPSEEK_API_KEY || "").trim();
+  const gemini =
+    runtimeEnv("GEMINI_API_KEY") ||
+    runtimeEnv("GEMINI_LUMEN_API_KEY") ||
+    runtimeEnv("GOOGLE_API_KEY") ||
+    runtimeEnv("GOOGLE_GENERATIVE_AI_API_KEY");
+  const deepseek = runtimeEnv("DEEPSEEK_API_KEY");
   return { gemini, deepseek };
 }
 
@@ -137,14 +142,14 @@ async function completeGemini(system: string, user: string): Promise<string> {
   }
 
   let last: unknown;
-  for (const model of GEMINI_MODELS) {
+  for (const model of geminiModels()) {
     try {
-      return await chatCompletions(GEMINI_OPENAI_URL, key, model, system, user);
+      return await geminiNative(key, model, system, user);
     } catch (err) {
       last = err;
     }
     try {
-      return await geminiNative(key, model, system, user);
+      return await chatCompletions(GEMINI_OPENAI_URL, key, model, system, user);
     } catch (err) {
       last = err;
     }
@@ -170,7 +175,7 @@ export async function generatePortfolioAnalysis(opts: {
   const { system, user } = buildAiMessages(opts.child, opts.kind, opts.locale);
   if (opts.provider === "gemini") {
     const text = await completeGemini(system, user);
-    return { text, provider: "gemini", modelHint: GEMINI_MODELS[0] ?? "gemini" };
+    return { text, provider: "gemini", modelHint: geminiModels()[0] ?? "gemini" };
   }
   const text = await completeDeepseek(system, user);
   return { text, provider: "deepseek", modelHint: DEEPSEEK_MODEL };
