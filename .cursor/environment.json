@@ -1,14 +1,16 @@
 {
-  "name": "Portfolio",
-  "install": "if [ -f package-lock.json ]; then npm ci; elif [ -f pnpm-lock.yaml ]; then corepack enable && pnpm install --frozen-lockfile; elif [ -f yarn.lock ]; then yarn install --frozen-lockfile; elif [ -f package.json ]; then npm install; else echo \"No package manifest yet — skipping dependency install\"; fi",
+  "name": "Lumen (Portfolio)",
+  "install": "if [ -f package-lock.json ]; then npm ci; elif [ -f package.json ]; then npm install; else echo \"No package manifest yet — skipping dependency install\"; fi",
+  "terminals": [
+    {
+      "name": "dev",
+      "command": "npm run dev"
+    }
+  ],
   "ports": [
     {
-      "name": "Next.js / React",
+      "name": "Next.js",
       "port": 3000
-    },
-    {
-      "name": "Vite",
-      "port": 5173
     }
   ]
 }
