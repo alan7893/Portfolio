@@ -28,7 +28,7 @@ services:
     environment:
       DATABASE_URL: "postgresql://${POSTGRES_USER:-kids}:${POSTGRES_PASSWORD:-kids_dev_pw}@db:5432/${POSTGRES_DB:-kids_portfolio}?schema=public"
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?set NEXTAUTH_SECRET in .env}
-      NEXTAUTH_URL: ${NEXTAUTH_URL:-https://portfolio.greednews.com}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-https://lumen.greednews.com}
       ADMIN_EMAIL: ${ADMIN_EMAIL:?set ADMIN_EMAIL in .env}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}
       UPLOAD_DIR: /app/uploads
