@@ -1,6 +1,7 @@
 {
   "name": "Kids Portfolio",
   "install": "bash scripts/dev-setup.sh",
+  "start": "sudo pg_ctlcluster 16 main start 2>/dev/null || sudo service postgresql start || true",
   "terminals": [
     {
       "name": "postgres",
