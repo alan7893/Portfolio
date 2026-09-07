@@ -17,12 +17,14 @@ type Labels = {
 export function EventFilters({
   labels,
   childOptions,
+  defaultChild,
   types,
   years,
   tags,
 }: {
   labels: Labels;
   childOptions: Option[];
+  defaultChild?: string;
   types: { value: EventType; label: string }[];
   years: string[];
   tags: string[];
@@ -30,11 +32,18 @@ export function EventFilters({
   const router = useRouter();
   const params = useSearchParams();
 
-  function update(key: string, value: string) {
+  async function update(key: string, value: string) {
     const next = new URLSearchParams(params.toString());
     if (value) next.set(key, value);
     else next.delete(key);
     next.delete("page");
+    if (key === "child") {
+      await fetch("/api/active-child", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ childId: value || null }),
+      });
+    }
     router.push(`/events?${next.toString()}`);
   }
 
@@ -49,7 +58,7 @@ export function EventFilters({
       <Field label={labels.child}>
         <select
           className="input"
-          value={params.get("child") ?? ""}
+          value={params.get("child") ?? defaultChild ?? ""}
           onChange={(e) => update("child", e.target.value)}
         >
           <option value="">{labels.all}</option>

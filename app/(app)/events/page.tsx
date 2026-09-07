@@ -8,6 +8,7 @@ import { EventCard } from "@/components/EventCard";
 import { EventFilters } from "@/components/EventFilters";
 import { Pagination } from "@/components/Pagination";
 import { EmptyState } from "@/components/EmptyState";
+import { getActiveChildId } from "@/lib/child.server";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -27,10 +28,12 @@ export default async function EventsPage({
 }) {
   const { locale, t } = await getI18n();
   const sp = await searchParams;
+  const cookieChild = await getActiveChildId();
 
   const page = Math.max(1, Number(sp.page) || 1);
   const where: Prisma.EventWhereInput = {};
-  if (sp.child) where.childId = sp.child;
+  const selectedChild = sp.child || cookieChild || undefined;
+  if (selectedChild) where.childId = selectedChild;
   if (sp.type && (EVENT_TYPES as string[]).includes(sp.type)) {
     where.eventType = sp.type as EventType;
   }
@@ -49,7 +52,7 @@ export default async function EventsPage({
     prisma.event.count({ where }),
     prisma.event.findMany({
       where,
-      include: { media: true, eventTags: { include: { tag: true } } },
+      include: { media: true, child: true, eventTags: { include: { tag: true } } },
       orderBy: { eventDate: "desc" },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
@@ -85,6 +88,7 @@ export default async function EventsPage({
           clear: t.common.clear,
         }}
         childOptions={options.children}
+        defaultChild={selectedChild ?? ""}
         types={EVENT_TYPES.map((tp) => ({ value: tp, label: t.eventTypes[tp] }))}
         years={options.years}
         tags={options.tags}
@@ -113,7 +117,7 @@ export default async function EventsPage({
         page={page}
         totalPages={totalPages}
         baseQuery={{
-          child: sp.child,
+          child: selectedChild,
           type: sp.type,
           year: sp.year,
           tag: sp.tag,

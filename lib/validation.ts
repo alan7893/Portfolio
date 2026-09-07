@@ -21,6 +21,22 @@ export const credentialsSchema = z.object({
   password: z.string().min(1),
 });
 
+export const childInputSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(80),
+  birthDate: z.string().min(1, "Birth date is required"),
+  school: z.string().trim().max(120).optional().or(z.literal("")),
+  notes: z.string().trim().max(2000).optional().or(z.literal("")),
+});
+
+export type ChildInput = z.infer<typeof childInputSchema>;
+
+export const aiGenerateSchema = z.object({
+  childId: z.string().uuid(),
+  provider: z.enum(["gemini", "deepseek"]),
+  kind: z.enum(["portfolio", "testimonial", "memory"]),
+  locale: z.enum(["zh-HK", "en"]).optional(),
+});
+
 export function parseTags(raw: string | undefined | null): string[] {
   if (!raw) return [];
   return Array.from(

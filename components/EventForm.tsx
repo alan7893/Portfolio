@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useFormStatus } from "react-dom";
+import { useFormState, useFormStatus } from "react-dom";
 import type { EventType, EventStatus } from "@prisma/client";
 import type { Dictionary } from "@/lib/i18n";
+import type { ActionState } from "@/lib/action-state";
 import { EVENT_TYPES, EVENT_STATUSES, CATEGORIES } from "@/lib/constants";
 import { FileUploader } from "./FileUploader";
 
@@ -38,12 +39,13 @@ export function EventForm({
   t,
   cancelHref,
 }: {
-  action: (formData: FormData) => void | Promise<void>;
+  action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
   childOptions: ChildOption[];
   defaults?: EventFormDefaults;
   t: Dictionary;
   cancelHref: string;
 }) {
+  const [state, formAction] = useFormState(action, { error: null });
   const [eventType, setEventType] = useState<EventType>(
     defaults?.eventType ?? "PHOTO",
   );
@@ -51,7 +53,7 @@ export function EventForm({
   const showRank = eventType === "PRIZE" || eventType === "COMPETITION";
 
   return (
-    <form action={action} className="space-y-5">
+    <form action={formAction} className="space-y-5">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <label className="label">{t.events.child}</label>
@@ -201,6 +203,12 @@ export function EventForm({
           }}
         />
       </div>
+
+      {state.error && (
+        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+          {t.events.formError} {state.error}
+        </p>
+      )}
 
       <div className="flex items-center gap-3 pt-2">
         <SubmitButton label={t.common.save} pendingLabel={t.common.loading} />

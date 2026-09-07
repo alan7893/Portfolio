@@ -12,6 +12,7 @@
     "prisma:deploy": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
+    "test": "tsx --test lib/ai-prompt.test.ts",
     "postinstall": "prisma generate"
   },
   "prisma": {

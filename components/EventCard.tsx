@@ -15,6 +15,7 @@ export type EventCardData = {
   achievementRank: string | null;
   firstImageMediaId: string | null;
   mediaCount: number;
+  childName?: string | null;
 };
 
 export function EventCard({
@@ -67,6 +68,9 @@ export function EventCard({
         <h3 className="font-semibold leading-snug text-ink-900">
           {event.title}
         </h3>
+        {event.childName && (
+          <p className="text-xs text-ink-700/60">{event.childName}</p>
+        )}
         {event.achievementRank && (
           <p className="text-sm font-medium text-amber-700">
             🏅 {event.achievementRank}

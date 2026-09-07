@@ -6,6 +6,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { eventInputSchema, parseTags } from "@/lib/validation";
+import type { ActionState } from "@/lib/action-state";
 import {
   deleteEventFiles,
   saveUploadedFile,
@@ -77,27 +78,41 @@ async function saveMediaFiles(
   }
 }
 
-export async function createEventAction(formData: FormData) {
+export async function createEventAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   await requireSession();
   const raw = readEventForm(formData);
-  const parsed = eventInputSchema.parse(raw);
+  const parsed = eventInputSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  const child = await prisma.child.findUnique({
+    where: { id: parsed.data.childId },
+    select: { id: true },
+  });
+  if (!child) {
+    return { error: "Child not found. Add a child first." };
+  }
 
   const event = await prisma.event.create({
     data: {
-      childId: parsed.childId,
-      eventType: parsed.eventType as never,
-      title: parsed.title,
-      description: parsed.description || null,
-      eventDate: new Date(parsed.eventDate),
-      category: parsed.category || null,
-      location: parsed.location || null,
-      achievementRank: parsed.achievementRank || null,
-      status: parsed.status as never,
+      childId: parsed.data.childId,
+      eventType: parsed.data.eventType as never,
+      title: parsed.data.title,
+      description: parsed.data.description || null,
+      eventDate: new Date(parsed.data.eventDate),
+      category: parsed.data.category || null,
+      location: parsed.data.location || null,
+      achievementRank: parsed.data.achievementRank || null,
+      status: parsed.data.status as never,
     },
   });
 
-  await syncTags(event.id, parseTags(parsed.tags));
-  await saveMediaFiles(formData, parsed.childId, event.id);
+  await syncTags(event.id, parseTags(parsed.data.tags));
+  await saveMediaFiles(formData, parsed.data.childId, event.id);
 
   revalidatePath("/");
   revalidatePath("/events");
@@ -105,26 +120,38 @@ export async function createEventAction(formData: FormData) {
   redirect(`/events/${event.id}`);
 }
 
-export async function updateEventAction(eventId: string, formData: FormData) {
+export async function updateEventAction(
+  eventId: string,
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   await requireSession();
   const raw = readEventForm(formData);
-  const parsed = eventInputSchema.parse(raw);
+  const parsed = eventInputSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  const existing = await prisma.event.findUnique({ where: { id: eventId } });
+  if (!existing) {
+    return { error: "Event not found." };
+  }
 
   const event = await prisma.event.update({
     where: { id: eventId },
     data: {
-      eventType: parsed.eventType as never,
-      title: parsed.title,
-      description: parsed.description || null,
-      eventDate: new Date(parsed.eventDate),
-      category: parsed.category || null,
-      location: parsed.location || null,
-      achievementRank: parsed.achievementRank || null,
-      status: parsed.status as never,
+      eventType: parsed.data.eventType as never,
+      title: parsed.data.title,
+      description: parsed.data.description || null,
+      eventDate: new Date(parsed.data.eventDate),
+      category: parsed.data.category || null,
+      location: parsed.data.location || null,
+      achievementRank: parsed.data.achievementRank || null,
+      status: parsed.data.status as never,
     },
   });
 
-  await syncTags(event.id, parseTags(parsed.tags));
+  await syncTags(event.id, parseTags(parsed.data.tags));
   await saveMediaFiles(formData, event.childId, event.id);
 
   revalidatePath("/");

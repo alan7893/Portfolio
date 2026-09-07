@@ -3,7 +3,7 @@ import type { EventCardData } from "@/components/EventCard";
 import type { Prisma } from "@prisma/client";
 
 type EventWithMedia = Prisma.EventGetPayload<{
-  include: { media: true; eventTags: { include: { tag: true } } };
+  include: { media: true; child: true; eventTags: { include: { tag: true } } };
 }>;
 
 export function toCardData(event: EventWithMedia): EventCardData {
@@ -19,6 +19,7 @@ export function toCardData(event: EventWithMedia): EventCardData {
     achievementRank: event.achievementRank,
     firstImageMediaId: firstImage?.id ?? null,
     mediaCount: event.media.length,
+    childName: event.child.name,
   };
 }
 

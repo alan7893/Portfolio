@@ -3,8 +3,11 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getI18n } from "@/lib/i18n.server";
+import { interpolate } from "@/lib/i18n";
 import { StatCard } from "@/components/StatCard";
+import { EmptyState } from "@/components/EmptyState";
 import { formatDate } from "@/lib/format";
+import { childEventWhere, getActiveChildId } from "@/lib/child.server";
 
 export const dynamic = "force-dynamic";
 
@@ -15,15 +18,39 @@ export default async function DashboardPage() {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const childWhere = await childEventWhere();
+  const activeId = await getActiveChildId();
+  const [childCount, activeChild] = await Promise.all([
+    prisma.child.count(),
+    activeId
+      ? prisma.child.findUnique({ where: { id: activeId }, select: { name: true } })
+      : Promise.resolve(null),
+  ]);
+
+  if (childCount === 0) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold text-ink-900">{t.dashboard.title}</h1>
+        <EmptyState
+          title={t.dashboard.emptyChildren}
+          cta={t.children.addChild}
+          href="/children/new"
+        />
+      </div>
+    );
+  }
 
   const [total, thisMonth, upcoming, latestPhotos] = await Promise.all([
-    prisma.event.count(),
+    prisma.event.count({ where: childWhere }),
     prisma.event.count({
-      where: { eventDate: { gte: monthStart, lt: monthEnd } },
+      where: { ...childWhere, eventDate: { gte: monthStart, lt: monthEnd } },
     }),
-    prisma.event.count({ where: { status: "PLANNED" } }),
+    prisma.event.count({ where: { ...childWhere, status: "PLANNED" } }),
     prisma.media.findMany({
-      where: { fileType: { startsWith: "image/" } },
+      where: {
+        fileType: { startsWith: "image/" },
+        ...(childWhere.childId ? { event: { childId: childWhere.childId } } : {}),
+      },
       orderBy: { createdAt: "desc" },
       take: 6,
       include: { event: true },
@@ -40,6 +67,11 @@ export default async function DashboardPage() {
           <p className="text-sm text-ink-700/70">
             {t.dashboard.welcome}
             {session?.user?.name ? `，${session.user.name}` : ""} ✦
+          </p>
+          <p className="mt-1 text-xs text-ink-700/60">
+            {activeChild
+              ? interpolate(t.dashboard.viewingChild, { name: activeChild.name })
+              : t.dashboard.viewingAll}
           </p>
         </div>
         <Link href="/events/new" className="btn-primary">

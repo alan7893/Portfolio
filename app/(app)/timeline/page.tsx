@@ -5,6 +5,7 @@ import type { Prisma } from "@prisma/client";
 import { formatDate, monthLabel } from "@/lib/format";
 import { TypeBadge, StatusBadge } from "@/components/TypeBadge";
 import { TimelineTabs } from "@/components/TimelineTabs";
+import { childEventWhere } from "@/lib/child.server";
 
 export const dynamic = "force-dynamic";
 
@@ -25,9 +26,10 @@ export default async function TimelinePage({
   const { locale, t } = await getI18n();
   const sp = await searchParams;
   const tab = sp.tab && sp.tab in TAB_FILTERS ? sp.tab : "all";
+  const childWhere = await childEventWhere();
 
   const events = await prisma.event.findMany({
-    where: TAB_FILTERS[tab],
+    where: { ...TAB_FILTERS[tab], ...childWhere },
     include: { media: true, child: true },
     orderBy: { eventDate: "desc" },
   });
@@ -129,6 +131,7 @@ export default async function TimelinePage({
                                 <p className="truncate font-semibold text-ink-900">
                                   {e.title}
                                 </p>
+                                <p className="text-xs text-ink-700/50">{e.child.name}</p>
                                 {e.description && (
                                   <p className="line-clamp-1 text-sm text-ink-700/70">
                                     {e.description}
