@@ -19,7 +19,7 @@ COPY . .
 # DATABASE_URL is only needed at runtime; a dummy keeps `prisma generate` happy.
 ENV DATABASE_URL="postgresql://user:pass@localhost:5432/db?schema=public"
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+RUN mkdir -p public && npm run build
 
 # ---- Runner ----
 FROM node:22-bookworm-slim AS runner
