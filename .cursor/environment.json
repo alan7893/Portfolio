@@ -1,0 +1,20 @@
+{
+  "name": "Kids Portfolio",
+  "install": "bash scripts/dev-setup.sh",
+  "terminals": [
+    {
+      "name": "postgres",
+      "command": "sudo pg_ctlcluster 16 main start 2>/dev/null || true; tail -F /var/log/postgresql/postgresql-16-main.log"
+    },
+    {
+      "name": "dev",
+      "command": "npm run dev"
+    }
+  ],
+  "ports": [
+    {
+      "name": "Next.js",
+      "port": 3000
+    }
+  ]
+}
