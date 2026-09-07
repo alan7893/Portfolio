@@ -185,6 +185,9 @@ const zhHK = {
     remove: "移除",
     tooLarge: "檔案太大（上限 25MB）：{name}",
     badType: "唔支援嘅檔案類型：{name}",
+    uploading: "相片上載緊…",
+    uploaded: "相片已上載到伺服器，撳「儲存」就會寫入紀錄。",
+    uploadFailed: "相片上載失敗，請再揀一次。",
   },
   months: [
     "一月",
@@ -393,6 +396,9 @@ const en: Dictionary = {
     remove: "Remove",
     tooLarge: "File too large (max 25MB): {name}",
     badType: "Unsupported file type: {name}",
+    uploading: "Uploading photo…",
+    uploaded: "Photo is on the server. Tap Save to add it to this record.",
+    uploadFailed: "Photo upload failed. Please choose it again.",
   },
   months: [
     "January",

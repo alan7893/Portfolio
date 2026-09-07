@@ -12,7 +12,13 @@ import {
   saveUploadedFile,
   validateFile,
   collectUploadedFiles,
+  collectStagedIds,
+  attachStagedFiles,
+  readStagedFile,
+  filenameStem,
+  mediaWriteErrorMessage,
 } from "@/lib/uploads";
+import type { SavedFile } from "@/lib/uploads";
 
 async function requireSession() {
   const session = await getServerSession(authOptions);
@@ -20,6 +26,10 @@ async function requireSession() {
     throw new Error("Unauthorized");
   }
   return session;
+}
+
+function sessionUserId(session: { user?: { id?: string } }): string {
+  return session.user?.id ?? "anon";
 }
 
 function readEventForm(formData: FormData) {
@@ -51,14 +61,32 @@ async function syncTags(eventId: string, tagNames: string[]) {
   }
 }
 
-async function saveMediaFiles(
+async function insertMediaRows(eventId: string, stored: SavedFile[]) {
+  for (const file of stored) {
+    await prisma.media.create({
+      data: {
+        eventId,
+        filePath: file.filePath,
+        fileType: file.fileType,
+        originalName: file.originalName,
+        sizeBytes: file.sizeBytes,
+      },
+    });
+  }
+}
+
+function fileTypeError(err: string): string {
+  return err.startsWith("tooLarge")
+    ? "A photo is larger than 25MB."
+    : "That photo type is not supported. Use JPEG, PNG, WebP, HEIC, MP4 or PDF.";
+}
+
+async function saveDirectUploads(
   formData: FormData,
   childId: string,
   eventId: string,
-): Promise<string | null> {
+): Promise<number> {
   const files = collectUploadedFiles(formData);
-  if (files.length === 0) return null;
-
   let saved = 0;
   let lastErr: string | null = null;
   for (const file of files) {
@@ -67,31 +95,49 @@ async function saveMediaFiles(
       lastErr = err;
       continue;
     }
-    const stored = await saveUploadedFile(file, childId, eventId);
-    await prisma.media.create({
-      data: {
-        eventId,
-        filePath: stored.filePath,
-        fileType: stored.fileType,
-        originalName: stored.originalName,
-        sizeBytes: stored.sizeBytes,
-      },
-    });
-    saved += 1;
+    try {
+      const stored = await saveUploadedFile(file, childId, eventId);
+      await insertMediaRows(eventId, [stored]);
+      saved += 1;
+    } catch (e) {
+      console.error("[media] direct save failed", e);
+      lastErr = mediaWriteErrorMessage(e);
+    }
   }
-  if (saved === 0 && lastErr) {
-    return lastErr.startsWith("tooLarge")
-      ? "A photo is larger than 25MB."
-      : "That photo type is not supported. Use JPEG, PNG, WebP, HEIC, MP4 or PDF.";
+  if (files.length > 0 && saved === 0) {
+    throw new Error(
+      lastErr?.startsWith("tooLarge") || lastErr?.startsWith("badType")
+        ? fileTypeError(lastErr)
+        : lastErr || "Could not save the photo.",
+    );
   }
-  return null;
+  return saved;
+}
+
+async function persistEventMedia(
+  formData: FormData,
+  userId: string,
+  childId: string,
+  eventId: string,
+): Promise<void> {
+  const stagedIds = collectStagedIds(formData);
+  if (stagedIds.length > 0) {
+    const stored = await attachStagedFiles(stagedIds, userId, childId, eventId);
+    if (stored.length === 0) {
+      throw new Error("Photos were not found on the server. Please choose them again.");
+    }
+    await insertMediaRows(eventId, stored);
+    return;
+  }
+  await saveDirectUploads(formData, childId, eventId);
 }
 
 export async function createEventAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireSession();
+  const session = await requireSession();
+  const userId = sessionUserId(session);
   const raw = readEventForm(formData);
   const parsed = eventInputSchema.safeParse(raw);
   if (!parsed.success) {
@@ -102,17 +148,26 @@ export async function createEventAction(
   for (const file of files) {
     const err = validateFile(file);
     if (err) {
+      return { error: fileTypeError(err) };
+    }
+  }
+
+  const stagedIds = collectStagedIds(formData);
+  let stagedName = "";
+  if (stagedIds.length > 0) {
+    const first = await readStagedFile(userId, stagedIds[0]);
+    stagedName = first?.originalName ?? "";
+    if (!first) {
       return {
-        error: err.startsWith("tooLarge")
-          ? "A photo is larger than 25MB."
-          : "That photo type is not supported. Use JPEG, PNG, WebP, HEIC, MP4 or PDF.",
+        error: "Photos were not found on the server. Please choose them again.",
       };
     }
   }
 
   const title =
     parsed.data.title ||
-    (files[0]?.name ? files[0].name.replace(/\.[^.]+$/, "") : "") ||
+    filenameStem(files[0]?.name ?? "") ||
+    filenameStem(stagedName) ||
     "";
   if (!title) {
     return { error: "Add a title, or upload a photo so AI can fill it." };
@@ -140,10 +195,14 @@ export async function createEventAction(
     },
   });
 
-  await syncTags(event.id, parseTags(parsed.data.tags));
-  const mediaErr = await saveMediaFiles(formData, parsed.data.childId, event.id);
-  if (mediaErr) {
-    return { error: mediaErr };
+  try {
+    await syncTags(event.id, parseTags(parsed.data.tags));
+    await persistEventMedia(formData, userId, parsed.data.childId, event.id);
+  } catch (e) {
+    console.error("[events] create media failed", e);
+    await prisma.event.delete({ where: { id: event.id } }).catch(() => {});
+    await deleteEventFiles(parsed.data.childId, event.id).catch(() => {});
+    return { error: mediaWriteErrorMessage(e) };
   }
 
   revalidatePath("/");
@@ -157,7 +216,8 @@ export async function updateEventAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireSession();
+  const session = await requireSession();
+  const userId = sessionUserId(session);
   const raw = readEventForm(formData);
   const parsed = eventInputSchema.safeParse(raw);
   if (!parsed.success) {
@@ -183,10 +243,12 @@ export async function updateEventAction(
     },
   });
 
-  await syncTags(event.id, parseTags(parsed.data.tags));
-  const mediaErr = await saveMediaFiles(formData, event.childId, event.id);
-  if (mediaErr) {
-    return { error: mediaErr };
+  try {
+    await syncTags(event.id, parseTags(parsed.data.tags));
+    await persistEventMedia(formData, userId, event.childId, event.id);
+  } catch (e) {
+    console.error("[events] update media failed", e);
+    return { error: mediaWriteErrorMessage(e) };
   }
 
   revalidatePath("/");

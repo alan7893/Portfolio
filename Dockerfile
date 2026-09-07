@@ -45,10 +45,12 @@ COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 COPY --from=builder /app/node_modules/bcryptjs ./node_modules/bcryptjs
 COPY --from=builder /app/prisma ./prisma
 
-# Uploads live on a mounted volume
+# Uploads live on a mounted volume. Entrypoint re-owns the mount at boot
+# because Docker volumes are often root-owned after recreate.
 RUN mkdir -p /app/uploads && chown -R nextjs:nodejs /app/uploads
+COPY docker-entrypoint.sh /usr/local/bin/kids-portfolio-entrypoint.sh
+RUN chmod +x /usr/local/bin/kids-portfolio-entrypoint.sh
 
-USER nextjs
+USER root
 EXPOSE 3000
-# Apply migrations, then start the standalone server.
-CMD ["sh", "-c", "node node_modules/prisma/build/index.js migrate deploy && node server.js"]
+ENTRYPOINT ["/usr/local/bin/kids-portfolio-entrypoint.sh"]

@@ -75,35 +75,37 @@ export function FileUploader({
         }}
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
-        onClick={() => inputRef.current?.click()}
-        className={`grid cursor-pointer place-items-center gap-1 rounded-xl border-2 border-dashed px-4 py-8 text-center transition ${
+        className={`relative grid place-items-center gap-1 overflow-hidden rounded-xl border-2 border-dashed px-4 py-8 text-center transition ${
           dragging
             ? "border-brand-500 bg-brand-50"
             : "border-black/15 bg-white/60 hover:border-brand-400"
         }`}
       >
-        <span className="text-2xl">📎</span>
-        <span className="text-sm font-medium text-ink-800">
+        <span className="pointer-events-none text-2xl">📎</span>
+        <span className="pointer-events-none text-sm font-medium text-ink-800">
           {labels.dropHint}
         </span>
-        <span className="text-xs text-ink-700/60">{labels.accept}</span>
+        <span className="pointer-events-none text-xs text-ink-700/60">
+          {labels.accept}
+        </span>
+        {/* Overlay, not display:none — iOS Safari drops hidden file inputs on submit. */}
+        <input
+          ref={inputRef}
+          type="file"
+          name="files"
+          multiple
+          accept={`${ACCEPTED_MIME.join(",")},.heic,.heif,.jpg,.jpeg,.png,.webp`}
+          className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+          onChange={syncFromInput}
+        />
       </div>
-      <input
-        ref={inputRef}
-        type="file"
-        name="files"
-        multiple
-        accept={`${ACCEPTED_MIME.join(",")},.heic,.heif,.jpg,.jpeg,.png,.webp`}
-        className="hidden"
-        onChange={syncFromInput}
-      />
       {names.length > 0 && (
         <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700">
           <span>{interpolate(labels.selected, { count: names.length })}</span>
           <button
             type="button"
             onClick={clearAll}
-            className="text-xs underline"
+            className="relative z-20 text-xs underline"
           >
             {labels.remove}
           </button>

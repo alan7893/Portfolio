@@ -23,10 +23,18 @@ export type EventFormDefaults = {
   tags?: string;
 };
 
-function SubmitButton({ label, pendingLabel }: { label: string; pendingLabel: string }) {
+function SubmitButton({
+  label,
+  pendingLabel,
+  disabled,
+}: {
+  label: string;
+  pendingLabel: string;
+  disabled?: boolean;
+}) {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" className="btn-primary" disabled={pending}>
+    <button type="submit" className="btn-primary" disabled={pending || disabled}>
       {pending ? pendingLabel : label}
     </button>
   );
@@ -53,7 +61,11 @@ export function EventForm({
   const [category, setCategory] = useState(defaults?.category ?? "");
   const [description, setDescription] = useState(defaults?.description ?? "");
   const [tags, setTags] = useState(defaults?.tags ?? "");
-  const [hasPhoto, setHasPhoto] = useState(false);
+  const [stagedIds, setStagedIds] = useState<string[]>([]);
+  const [uploadStatus, setUploadStatus] = useState<
+    "idle" | "uploading" | "done" | "error"
+  >("idle");
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [captionStatus, setCaptionStatus] = useState<
     "idle" | "loading" | "done" | "error"
   >("idle");
@@ -67,7 +79,41 @@ export function EventForm({
         f.type.startsWith("image/") ||
         /\.(jpe?g|png|webp|heic|heif)$/i.test(f.name),
     );
-    setHasPhoto(Boolean(image));
+    if (!files.length) {
+      setStagedIds([]);
+      setUploadStatus("idle");
+      setUploadError(null);
+      setCaptionStatus("idle");
+      return;
+    }
+
+    setUploadStatus("uploading");
+    setUploadError(null);
+    const nextIds: string[] = [];
+    try {
+      for (const file of files) {
+        const body = new FormData();
+        body.append("file", file);
+        const res = await fetch("/api/media/stage", { method: "POST", body });
+        const json = (await res.json().catch(() => ({}))) as {
+          id?: string;
+          error?: string;
+        };
+        if (!res.ok || !json.id) {
+          throw new Error(json.error || "Upload failed");
+        }
+        nextIds.push(json.id);
+      }
+      setStagedIds(nextIds);
+      setUploadStatus("done");
+    } catch (e) {
+      setStagedIds([]);
+      setUploadStatus("error");
+      setUploadError(e instanceof Error ? e.message : t.upload.uploadFailed);
+      setCaptionStatus("idle");
+      return;
+    }
+
     if (!image) {
       setCaptionStatus("idle");
       return;
@@ -139,7 +185,7 @@ export function EventForm({
       <div>
         <label className="label">
           {t.events.titleField}{" "}
-          {hasPhoto && (
+          {stagedIds.length > 0 && (
             <span className="text-xs font-normal text-ink-700/50">
               ({t.common.optional})
             </span>
@@ -154,7 +200,7 @@ export function EventForm({
             setTitle(e.target.value);
           }}
           maxLength={200}
-          required={!hasPhoto}
+          required={stagedIds.length === 0}
           placeholder={t.events.titleFromPhoto}
         />
       </div>
@@ -267,6 +313,9 @@ export function EventForm({
             remove: t.upload.remove,
           }}
         />
+        {stagedIds.map((id) => (
+          <input key={id} type="hidden" name="staged" value={id} />
+        ))}
         {captionStatus === "loading" && (
           <p className="mt-2 text-sm text-brand-700">{t.events.captioning}</p>
         )}
@@ -275,6 +324,18 @@ export function EventForm({
         )}
         {captionStatus === "error" && (
           <p className="mt-2 text-sm text-amber-800">{t.events.captionFailed}</p>
+        )}
+        {uploadStatus === "uploading" && (
+          <p className="mt-2 text-sm text-brand-700">{t.upload.uploading}</p>
+        )}
+        {uploadStatus === "done" && (
+          <p className="mt-2 text-sm text-emerald-700">{t.upload.uploaded}</p>
+        )}
+        {uploadStatus === "error" && (
+          <p className="mt-2 text-sm text-red-600">
+            {t.upload.uploadFailed}
+            {uploadError ? ` ${uploadError}` : ""}
+          </p>
         )}
       </div>
 
@@ -285,7 +346,11 @@ export function EventForm({
       )}
 
       <div className="flex items-center gap-3 pt-2">
-        <SubmitButton label={t.common.save} pendingLabel={t.common.loading} />
+        <SubmitButton
+          label={t.common.save}
+          pendingLabel={t.common.loading}
+          disabled={uploadStatus === "uploading"}
+        />
         <a href={cancelHref} className="btn-ghost">
           {t.common.cancel}
         </a>
