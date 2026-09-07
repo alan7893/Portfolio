@@ -1,0 +1,25 @@
+# Caddy reverse proxy for Kids Portfolio.
+#
+# TLS uses a Cloudflare Origin Certificate (not Let's Encrypt), because
+# Cloudflare sits in front in Full (strict) mode. Place the origin cert and key
+# at ./caddy/certs/ (mounted read-only into the container):
+#   caddy/certs/origin.pem   (certificate)
+#   caddy/certs/origin.key   (private key)
+
+portfolio.greednews.com {
+	encode zstd gzip
+
+	tls /etc/caddy/certs/origin.pem /etc/caddy/certs/origin.key
+
+	# Cap request bodies a bit above the 25MB per-file upload limit.
+	request_body {
+		max_size 30MB
+	}
+
+	reverse_proxy app:3000
+}
+
+# Redirect plain HTTP to HTTPS.
+http://portfolio.greednews.com {
+	redir https://{host}{uri} permanent
+}

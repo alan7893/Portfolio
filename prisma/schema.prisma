@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EventType {
+  PHOTO
+  PRIZE
+  COMPETITION
+  SCHEDULE
+  MILESTONE
+  OTHER
+}
+
+enum EventStatus {
+  PLANNED
+  COMPLETED
+}
+
+enum Role {
+  ADMIN
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  role         Role     @default(ADMIN)
+  createdAt    DateTime @default(now())
+}
+
+model Child {
+  id        String   @id @default(uuid())
+  name      String
+  birthDate DateTime @map("birth_date")
+  school    String?
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  events Event[]
+
+  @@map("children")
+}
+
+model Event {
+  id              String      @id @default(uuid())
+  childId         String      @map("child_id")
+  eventType       EventType   @map("event_type")
+  title           String
+  description     String?
+  eventDate       DateTime    @map("event_date")
+  category        String?
+  location        String?
+  achievementRank String?     @map("achievement_rank")
+  status          EventStatus @default(COMPLETED)
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  child     Child      @relation(fields: [childId], references: [id], onDelete: Cascade)
+  media     Media[]
+  eventTags EventTag[]
+
+  @@index([childId])
+  @@index([eventType])
+  @@index([eventDate])
+  @@map("events")
+}
+
+model Media {
+  id           String   @id @default(uuid())
+  eventId      String   @map("event_id")
+  filePath     String   @map("file_path")
+  fileType     String   @map("file_type")
+  originalName String   @map("original_name")
+  sizeBytes    Int      @map("size_bytes")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@map("media")
+}
+
+model Tag {
+  id        String     @id @default(uuid())
+  name      String     @unique
+  eventTags EventTag[]
+
+  @@map("tags")
+}
+
+model EventTag {
+  eventId String @map("event_id")
+  tagId   String @map("tag_id")
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  tag   Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, tagId])
+  @@map("event_tags")
+}

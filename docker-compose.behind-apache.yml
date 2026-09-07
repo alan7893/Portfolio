@@ -1,0 +1,16 @@
+# Overlay for the existing greednews.com droplet (Apache already owns :80/:443).
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.behind-apache.yml up -d --build
+#
+# Caddy is disabled (profile-gated) so WordPress on Apache is not displaced.
+# The Next.js app is published on loopback only; Apache proxies
+# portfolio.greednews.com -> 127.0.0.1:3000.
+
+services:
+  caddy:
+    profiles:
+      - caddy
+
+  app:
+    ports:
+      - "127.0.0.1:3000:3000"
