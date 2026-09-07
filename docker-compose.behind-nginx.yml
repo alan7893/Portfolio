@@ -1,0 +1,14 @@
+# Overlay for the sctr Ubuntu droplet (nginx already owns :80/:443).
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.behind-nginx.yml up -d --build
+#
+# Caddy is disabled. App is loopback-only; nginx proxies lumen.greednews.com.
+
+services:
+  caddy:
+    profiles:
+      - caddy
+
+  app:
+    ports:
+      - "127.0.0.1:3010:3000"
