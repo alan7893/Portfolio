@@ -1,4 +1,5 @@
 import { buildAiMessages, type AiKind, type AiProvider, type ChildSummary } from "@/lib/ai-prompt";
+import { buildCaptionPrompt, parseCaptionJson, type PhotoCaption } from "@/lib/ai-caption";
 import type { Locale } from "@/lib/i18n";
 
 function runtimeEnv(name: string): string {
@@ -103,15 +104,22 @@ async function geminiNative(
   model: string,
   system: string,
   user: string,
+  image?: { mimeType: string; dataBase64: string },
 ): Promise<string> {
   const url = `${GEMINI_NATIVE_BASE}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const userParts: Array<Record<string, unknown>> = [{ text: user }];
+  if (image) {
+    userParts.unshift({
+      inlineData: { mimeType: image.mimeType, data: image.dataBase64 },
+    });
+  }
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: system }] },
-      contents: [{ role: "user", parts: [{ text: user }] }],
-      generationConfig: { temperature: 0.6 },
+      contents: [{ role: "user", parts: userParts }],
+      generationConfig: { temperature: 0.3 },
     }),
     signal: AbortSignal.timeout(60_000),
   });
@@ -135,7 +143,11 @@ async function geminiNative(
   return content;
 }
 
-async function completeGemini(system: string, user: string): Promise<string> {
+async function completeGemini(
+  system: string,
+  user: string,
+  image?: { mimeType: string; dataBase64: string },
+): Promise<string> {
   const key = getAiKeys().gemini;
   if (!key) {
     throw new AiError("Gemini API key is not configured.", 501);
@@ -144,14 +156,16 @@ async function completeGemini(system: string, user: string): Promise<string> {
   let last: unknown;
   for (const model of geminiModels()) {
     try {
-      return await geminiNative(key, model, system, user);
+      return await geminiNative(key, model, system, user, image);
     } catch (err) {
       last = err;
     }
-    try {
-      return await chatCompletions(GEMINI_OPENAI_URL, key, model, system, user);
-    } catch (err) {
-      last = err;
+    if (!image) {
+      try {
+        return await chatCompletions(GEMINI_OPENAI_URL, key, model, system, user);
+      } catch (err) {
+        last = err;
+      }
     }
   }
   if (last instanceof AiError) throw last;
@@ -179,4 +193,17 @@ export async function generatePortfolioAnalysis(opts: {
   }
   const text = await completeDeepseek(system, user);
   return { text, provider: "deepseek", modelHint: DEEPSEEK_MODEL };
+}
+
+export async function captionPhoto(opts: {
+  locale: Locale;
+  mimeType: string;
+  dataBase64: string;
+}): Promise<PhotoCaption & { provider: "gemini" }> {
+  const { system, user } = buildCaptionPrompt(opts.locale);
+  const raw = await completeGemini(system, user, {
+    mimeType: opts.mimeType,
+    dataBase64: opts.dataBase64,
+  });
+  return { ...parseCaptionJson(raw), provider: "gemini" };
 }

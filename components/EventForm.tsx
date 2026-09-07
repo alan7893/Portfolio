@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import type { EventType, EventStatus } from "@prisma/client";
 import type { Dictionary } from "@/lib/i18n";
@@ -49,8 +49,57 @@ export function EventForm({
   const [eventType, setEventType] = useState<EventType>(
     defaults?.eventType ?? "PHOTO",
   );
+  const [title, setTitle] = useState(defaults?.title ?? "");
+  const [category, setCategory] = useState(defaults?.category ?? "");
+  const [description, setDescription] = useState(defaults?.description ?? "");
+  const [tags, setTags] = useState(defaults?.tags ?? "");
+  const [hasPhoto, setHasPhoto] = useState(false);
+  const [captionStatus, setCaptionStatus] = useState<
+    "idle" | "loading" | "done" | "error"
+  >("idle");
+  const userEditedTitle = useRef(Boolean(defaults?.title));
 
   const showRank = eventType === "PRIZE" || eventType === "COMPETITION";
+
+  async function onFiles(files: File[]) {
+    const image = files.find(
+      (f) =>
+        f.type.startsWith("image/") ||
+        /\.(jpe?g|png|webp|heic|heif)$/i.test(f.name),
+    );
+    setHasPhoto(Boolean(image));
+    if (!image) {
+      setCaptionStatus("idle");
+      return;
+    }
+    setCaptionStatus("loading");
+    try {
+      const body = new FormData();
+      body.append("file", image);
+      body.append("locale", t.locale);
+      const res = await fetch("/api/ai/caption", { method: "POST", body });
+      const json = (await res.json().catch(() => ({}))) as {
+        title?: string;
+        category?: string;
+        eventType?: EventType;
+        description?: string;
+        tags?: string[];
+        error?: string;
+      };
+      if (!res.ok) {
+        setCaptionStatus("error");
+        return;
+      }
+      if (!userEditedTitle.current && json.title) setTitle(json.title);
+      if (json.category) setCategory(json.category);
+      if (json.description && !description) setDescription(json.description);
+      if (json.eventType) setEventType(json.eventType);
+      if (json.tags?.length && !tags) setTags(json.tags.join(", "));
+      setCaptionStatus("done");
+    } catch {
+      setCaptionStatus("error");
+    }
+  }
 
   return (
     <form action={formAction} className="space-y-5">
@@ -88,13 +137,25 @@ export function EventForm({
       </div>
 
       <div>
-        <label className="label">{t.events.titleField}</label>
+        <label className="label">
+          {t.events.titleField}{" "}
+          {hasPhoto && (
+            <span className="text-xs font-normal text-ink-700/50">
+              ({t.common.optional})
+            </span>
+          )}
+        </label>
         <input
           name="title"
           className="input"
-          defaultValue={defaults?.title ?? ""}
+          value={title}
+          onChange={(e) => {
+            userEditedTitle.current = true;
+            setTitle(e.target.value);
+          }}
           maxLength={200}
-          required
+          required={!hasPhoto}
+          placeholder={t.events.titleFromPhoto}
         />
       </div>
 
@@ -114,7 +175,8 @@ export function EventForm({
           <select
             name="category"
             className="input"
-            defaultValue={defaults?.category ?? ""}
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
           >
             <option value="">—</option>
             {CATEGORIES.map((c) => (
@@ -174,7 +236,8 @@ export function EventForm({
         <textarea
           name="description"
           className="input min-h-[96px]"
-          defaultValue={defaults?.description ?? ""}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
           maxLength={5000}
         />
       </div>
@@ -185,7 +248,8 @@ export function EventForm({
           name="tags"
           className="input"
           placeholder={t.events.tagsHint}
-          defaultValue={defaults?.tags ?? ""}
+          value={tags}
+          onChange={(e) => setTags(e.target.value)}
         />
         <p className="mt-1 text-xs text-ink-700/50">{t.events.tagsHint}</p>
       </div>
@@ -193,6 +257,7 @@ export function EventForm({
       <div>
         <label className="label">{t.events.media}</label>
         <FileUploader
+          onFiles={onFiles}
           labels={{
             dropHint: t.upload.dropHint,
             accept: t.upload.accept,
@@ -202,6 +267,15 @@ export function EventForm({
             remove: t.upload.remove,
           }}
         />
+        {captionStatus === "loading" && (
+          <p className="mt-2 text-sm text-brand-700">{t.events.captioning}</p>
+        )}
+        {captionStatus === "done" && (
+          <p className="mt-2 text-sm text-emerald-700">{t.events.captioned}</p>
+        )}
+        {captionStatus === "error" && (
+          <p className="mt-2 text-sm text-amber-800">{t.events.captionFailed}</p>
+        )}
       </div>
 
       {state.error && (

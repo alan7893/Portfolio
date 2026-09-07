@@ -3,6 +3,7 @@
 #   docker compose -f docker-compose.yml -f docker-compose.behind-nginx.yml up -d --build
 #
 # Caddy is disabled. App is loopback-only; nginx proxies lumen.greednews.com.
+# Host nginx must allow large uploads, e.g. client_max_body_size 30m;
 
 services:
   caddy:

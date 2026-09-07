@@ -11,6 +11,7 @@ import {
   deleteEventFiles,
   saveUploadedFile,
   validateFile,
+  collectUploadedFiles,
 } from "@/lib/uploads";
 
 async function requireSession() {
@@ -54,28 +55,36 @@ async function saveMediaFiles(
   formData: FormData,
   childId: string,
   eventId: string,
-) {
-  const files = formData
-    .getAll("files")
-    .filter((f): f is File => f instanceof File && f.size > 0);
+): Promise<string | null> {
+  const files = collectUploadedFiles(formData);
+  if (files.length === 0) return null;
 
+  let saved = 0;
+  let lastErr: string | null = null;
   for (const file of files) {
     const err = validateFile(file);
     if (err) {
-      // Skip invalid files silently here; client-side validation already warns.
+      lastErr = err;
       continue;
     }
-    const saved = await saveUploadedFile(file, childId, eventId);
+    const stored = await saveUploadedFile(file, childId, eventId);
     await prisma.media.create({
       data: {
         eventId,
-        filePath: saved.filePath,
-        fileType: saved.fileType,
-        originalName: saved.originalName,
-        sizeBytes: saved.sizeBytes,
+        filePath: stored.filePath,
+        fileType: stored.fileType,
+        originalName: stored.originalName,
+        sizeBytes: stored.sizeBytes,
       },
     });
+    saved += 1;
   }
+  if (saved === 0 && lastErr) {
+    return lastErr.startsWith("tooLarge")
+      ? "A photo is larger than 25MB."
+      : "That photo type is not supported. Use JPEG, PNG, WebP, HEIC, MP4 or PDF.";
+  }
+  return null;
 }
 
 export async function createEventAction(
@@ -87,6 +96,26 @@ export async function createEventAction(
   const parsed = eventInputSchema.safeParse(raw);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  const files = collectUploadedFiles(formData);
+  for (const file of files) {
+    const err = validateFile(file);
+    if (err) {
+      return {
+        error: err.startsWith("tooLarge")
+          ? "A photo is larger than 25MB."
+          : "That photo type is not supported. Use JPEG, PNG, WebP, HEIC, MP4 or PDF.",
+      };
+    }
+  }
+
+  const title =
+    parsed.data.title ||
+    (files[0]?.name ? files[0].name.replace(/\.[^.]+$/, "") : "") ||
+    "";
+  if (!title) {
+    return { error: "Add a title, or upload a photo so AI can fill it." };
   }
 
   const child = await prisma.child.findUnique({
@@ -101,7 +130,7 @@ export async function createEventAction(
     data: {
       childId: parsed.data.childId,
       eventType: parsed.data.eventType as never,
-      title: parsed.data.title,
+      title,
       description: parsed.data.description || null,
       eventDate: new Date(parsed.data.eventDate),
       category: parsed.data.category || null,
@@ -112,7 +141,10 @@ export async function createEventAction(
   });
 
   await syncTags(event.id, parseTags(parsed.data.tags));
-  await saveMediaFiles(formData, parsed.data.childId, event.id);
+  const mediaErr = await saveMediaFiles(formData, parsed.data.childId, event.id);
+  if (mediaErr) {
+    return { error: mediaErr };
+  }
 
   revalidatePath("/");
   revalidatePath("/events");
@@ -141,7 +173,7 @@ export async function updateEventAction(
     where: { id: eventId },
     data: {
       eventType: parsed.data.eventType as never,
-      title: parsed.data.title,
+      title: parsed.data.title || existing.title,
       description: parsed.data.description || null,
       eventDate: new Date(parsed.data.eventDate),
       category: parsed.data.category || null,
@@ -152,7 +184,10 @@ export async function updateEventAction(
   });
 
   await syncTags(event.id, parseTags(parsed.data.tags));
-  await saveMediaFiles(formData, event.childId, event.id);
+  const mediaErr = await saveMediaFiles(formData, event.childId, event.id);
+  if (mediaErr) {
+    return { error: mediaErr };
+  }
 
   revalidatePath("/");
   revalidatePath("/events");

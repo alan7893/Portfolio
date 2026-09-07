@@ -95,6 +95,10 @@ const zhHK = {
     resultsCount: "共 {count} 項",
     needChild: "新增事件之前，請先建立最少一個小朋友檔案。",
     formError: "未能儲存，請檢查必填欄位。",
+    titleFromPhoto: "上載相片，AI 會幫手填標題同類別",
+    captioning: "AI 睇緊相片，填緊標題同類別…",
+    captioned: "已用相片填好，可以再改。",
+    captionFailed: "AI 睇唔到呢張相，請自己填標題。",
   },
   eventTypes: {
     PHOTO: "相片",
@@ -175,7 +179,7 @@ const zhHK = {
   },
   upload: {
     dropHint: "拖曳檔案到呢度，或者㩒一下揀選",
-    accept: "支援 JPEG／PNG／WebP／MP4／PDF，每個檔案最多 25MB",
+    accept: "支援 JPEG／PNG／WebP／HEIC／MP4／PDF，每個檔案最多 25MB",
     selected: "已揀選 {count} 個檔案",
     existing: "已上載嘅檔案",
     remove: "移除",
@@ -295,6 +299,10 @@ const en: Dictionary = {
     resultsCount: "{count} results",
     needChild: "Add at least one child before creating an event.",
     formError: "Could not save. Please check the required fields.",
+    titleFromPhoto: "Upload a photo and AI will fill the title and category",
+    captioning: "AI is reading the photo…",
+    captioned: "Filled from the photo — you can still edit.",
+    captionFailed: "AI could not read this photo. Please add a title.",
   },
   eventTypes: {
     PHOTO: "Photo",
@@ -379,7 +387,7 @@ const en: Dictionary = {
   },
   upload: {
     dropHint: "Drag files here, or click to choose",
-    accept: "JPEG / PNG / WebP / MP4 / PDF, up to 25MB each",
+    accept: "JPEG / PNG / WebP / HEIC / MP4 / PDF, up to 25MB each",
     selected: "{count} file(s) selected",
     existing: "Uploaded files",
     remove: "Remove",

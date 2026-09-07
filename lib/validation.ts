@@ -4,7 +4,7 @@ import { EVENT_TYPES, EVENT_STATUSES } from "@/lib/constants";
 export const eventInputSchema = z.object({
   childId: z.string().uuid({ message: "childId must be a valid id" }),
   eventType: z.enum(EVENT_TYPES as [string, ...string[]]),
-  title: z.string().trim().min(1, "Title is required").max(200),
+  title: z.string().trim().max(200).optional().or(z.literal("")),
   description: z.string().trim().max(5000).optional().or(z.literal("")),
   eventDate: z.string().min(1, "Date is required"),
   category: z.string().trim().max(60).optional().or(z.literal("")),

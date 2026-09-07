@@ -23,6 +23,8 @@ export const ACCEPTED_MIME = [
   "image/jpeg",
   "image/png",
   "image/webp",
+  "image/heic",
+  "image/heif",
   "video/mp4",
   "application/pdf",
 ] as const;
@@ -33,4 +35,16 @@ export const PAGE_SIZE = 9;
 
 export function isImageMime(mime: string): boolean {
   return mime.startsWith("image/");
+}
+
+export function mimeFromName(name: string): string {
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
+  if (ext === "png") return "image/png";
+  if (ext === "webp") return "image/webp";
+  if (ext === "heic") return "image/heic";
+  if (ext === "heif") return "image/heif";
+  if (ext === "mp4") return "video/mp4";
+  if (ext === "pdf") return "application/pdf";
+  return "";
 }

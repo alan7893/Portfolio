@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ACCEPTED_MIME, MAX_FILE_BYTES } from "@/lib/constants";
+import { ACCEPTED_MIME, MAX_FILE_BYTES, mimeFromName } from "@/lib/constants";
 import { interpolate } from "@/lib/i18n";
 
 type Labels = {
@@ -13,7 +13,13 @@ type Labels = {
   remove: string;
 };
 
-export function FileUploader({ labels }: { labels: Labels }) {
+export function FileUploader({
+  labels,
+  onFiles,
+}: {
+  labels: Labels;
+  onFiles?: (files: File[]) => void;
+}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [names, setNames] = useState<string[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -22,10 +28,12 @@ export function FileUploader({ labels }: { labels: Labels }) {
   function syncFromInput() {
     const files = inputRef.current?.files;
     if (!files) return;
+    const accepted: File[] = [];
     const nextNames: string[] = [];
     const nextWarnings: string[] = [];
     for (const f of Array.from(files)) {
-      if (!ACCEPTED_MIME.includes(f.type as (typeof ACCEPTED_MIME)[number])) {
+      const type = f.type || mimeFromName(f.name);
+      if (!ACCEPTED_MIME.includes(type as (typeof ACCEPTED_MIME)[number])) {
         nextWarnings.push(interpolate(labels.badType, { name: f.name }));
         continue;
       }
@@ -33,10 +41,12 @@ export function FileUploader({ labels }: { labels: Labels }) {
         nextWarnings.push(interpolate(labels.tooLarge, { name: f.name }));
         continue;
       }
+      accepted.push(f);
       nextNames.push(f.name);
     }
     setNames(nextNames);
     setWarnings(nextWarnings);
+    onFiles?.(accepted);
   }
 
   function onDrop(e: React.DragEvent) {
@@ -53,6 +63,7 @@ export function FileUploader({ labels }: { labels: Labels }) {
     if (inputRef.current) inputRef.current.value = "";
     setNames([]);
     setWarnings([]);
+    onFiles?.([]);
   }
 
   return (
@@ -82,7 +93,7 @@ export function FileUploader({ labels }: { labels: Labels }) {
         type="file"
         name="files"
         multiple
-        accept={ACCEPTED_MIME.join(",")}
+        accept={`${ACCEPTED_MIME.join(",")},.heic,.heif,.jpg,.jpeg,.png,.webp`}
         className="hidden"
         onChange={syncFromInput}
       />
