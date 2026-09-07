@@ -4,6 +4,9 @@
 #
 # Caddy is disabled. App is loopback-only; nginx proxies lumen.greednews.com.
 # Host nginx must allow large uploads, e.g. client_max_body_size 30m;
+# Do not set `proxy_set_header Connection upgrade;` on the whole `/` location —
+# that breaks Next.js server actions (Save). Use `Connection ""` unless the
+# location is specifically for WebSockets.
 
 services:
   caddy:
