@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n";
 import type { AiKind, AiProvider } from "@/lib/ai-prompt";
@@ -36,6 +36,12 @@ export function AiAnalysisPanel({
   const [result, setResult] = useState<string>("");
   const [copied, setCopied] = useState(false);
 
+  useEffect(() => {
+    if (!childId && kids[0]?.id) {
+      setChildId(kids[0].id);
+    }
+  }, [childId, kids]);
+
   const selected = useMemo(
     () => kids.find((c) => c.id === childId),
     [kids, childId],
@@ -44,9 +50,10 @@ export function AiAnalysisPanel({
   const anyProvider = providers.gemini || providers.deepseek;
 
   async function generate() {
+    const id = childId || kids[0]?.id || "";
     setError(null);
     setResult("");
-    if (!childId) {
+    if (!id) {
       setError(t.ai.emptyChild);
       return;
     }
@@ -59,7 +66,7 @@ export function AiAnalysisPanel({
       const res = await fetch("/api/ai/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ childId, provider, kind, locale }),
+        body: JSON.stringify({ childId: id, provider, kind, locale }),
       });
       const json = (await res.json().catch(() => ({}))) as {
         text?: string;
