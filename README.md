@@ -5,7 +5,7 @@
 A private family website to record a child's life events (photos, prizes, competitions, schedules, milestones). **Traditional Chinese (Hong Kong / Cantonese) is the base UI language**, with an English toggle.
 
 - Production domain: `portfolio.greednews.com`
-- Deploy target: a single DigitalOcean Droplet (Ubuntu 24.04), self-hosted via Docker Compose (Caddy + app + Postgres)
+- Deploy target: DigitalOcean. Dedicated Ubuntu 24.04 + Caddy is the clean setup; the existing `greednews.com` CentOS droplet can host it **behind Apache** so WordPress keeps ports 80/443.
 
 ## Tech stack
 
@@ -61,6 +61,23 @@ docker compose exec app node_modules/.bin/prisma db seed   # optional sample dat
 ```
 
 ## Production deploy (DigitalOcean Droplet)
+
+### Option A — sit behind the existing greednews.com Apache droplet
+
+This is the path that does **not** steal `:80`/`:443` from WordPress. Docker publishes the app on `127.0.0.1:3000` only; Apache vhosts `portfolio.greednews.com`.
+
+From a machine that can SSH to the droplet (`DEPLOY_HOST` / `DEPLOY_USER` / `DEPLOY_SSH_PRIVATE_KEY`):
+
+```bash
+export ADMIN_EMAIL='you@example.com'
+export ADMIN_PASSWORD='choose-a-strong-password'
+# optional: export CLOUDFLARE_API_TOKEN='...'  # Zone.DNS Edit, creates the A record
+./scripts/go-live.sh
+```
+
+Cloudflare DNS if you are adding it by hand: `A portfolio → <droplet IPv4>`, proxied. SSL/TLS mode **Full** (not Full Strict) until an Origin Certificate is installed.
+
+### Option B — dedicated Ubuntu 24.04 droplet with Caddy
 
 ```bash
 # On the droplet (Ubuntu 24.04, Docker + compose plugin installed):
