@@ -11,7 +11,7 @@ import {
 import { mimeFromName } from "@/lib/constants";
 import { checkRateLimit, registerFailedAttempt } from "@/lib/rateLimit";
 import { DEFAULT_LOCALE, normalizeLocale } from "@/lib/i18n";
-import { prepareVisionJpeg } from "@/lib/photo-vision";
+import { prepareVisionJpeg, extractPhotoTakenAt } from "@/lib/photo-vision";
 import { getPrivacySettings } from "@/lib/privacy.server";
 
 export const runtime = "nodejs";
@@ -90,6 +90,7 @@ export async function POST(request: Request) {
   }
 
   const locale = normalizeLocale(String(form.get("locale") ?? DEFAULT_LOCALE));
+  const suggestedDate = await extractPhotoTakenAt(original);
 
   let vision;
   try {
@@ -120,6 +121,7 @@ export async function POST(request: Request) {
       photoPurpose: caption.photoPurpose,
       nameOnEvidence: caption.nameOnEvidence,
       childReflection: caption.childReflection,
+      suggestedDate,
     });
   } catch (e) {
     registerFailedAttempt(`ai-caption:${userId}`);

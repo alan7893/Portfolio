@@ -86,10 +86,26 @@ export default async function DashboardPage() {
               : t.dashboard.viewingAll}
           </p>
         </div>
-        <Link href="/events/new" className="btn-primary">
-          + {t.events.newEvent}
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/events/bulk" className="btn-primary">
+            {t.dashboard.bulkCta}
+          </Link>
+          <Link href="/events/new" className="btn-ghost">
+            + {t.events.newEvent}
+          </Link>
+        </div>
       </div>
+
+      <Link
+        href="/events/bulk"
+        className="card block p-5 transition hover:shadow-md"
+      >
+        <p className="text-sm font-semibold text-ink-900">{t.dashboard.bulkCard}</p>
+        <p className="mt-1 text-sm text-ink-700/70">{t.dashboard.bulkBlurb}</p>
+        <p className="mt-2 text-sm font-medium text-brand-700">
+          {t.dashboard.bulkCta} →
+        </p>
+      </Link>
 
       <Link
         href="/guide"

@@ -36,6 +36,9 @@ export const MAX_FILE_BYTES = 25 * 1024 * 1024; // 25MB
 
 export const PAGE_SIZE = 9;
 
+/** Max photos in one bulk import. Each photo becomes its own event. */
+export const BULK_MAX_PHOTOS = 20;
+
 export function isImageMime(mime: string): boolean {
   return mime.startsWith("image/");
 }

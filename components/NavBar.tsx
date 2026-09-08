@@ -16,6 +16,7 @@ type NavLabels = {
   ai: string;
   guide: string;
   newEvent: string;
+  bulk: string;
   settings: string;
   signOut: string;
   allKids: string;
@@ -91,8 +92,11 @@ export function NavBar({
               manage: labels.manage,
             }}
           />
-          <Link href="/events/new" className="btn-primary hidden sm:inline-flex">
+          <Link href="/events/new" className="btn-ghost hidden sm:inline-flex">
             + {labels.newEvent}
+          </Link>
+          <Link href="/events/bulk" className="btn-primary hidden sm:inline-flex">
+            {labels.bulk}
           </Link>
           <Link href="/settings" className="btn-ghost hidden md:inline-flex">
             {labels.settings}
@@ -117,9 +121,15 @@ export function NavBar({
         ))}
         <Link
           href="/events/new"
-          className="ml-auto rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white"
+          className="ml-auto rounded-lg bg-black/5 px-3 py-1.5 text-sm font-medium text-ink-800"
         >
           +
+        </Link>
+        <Link
+          href="/events/bulk"
+          className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white"
+        >
+          {labels.bulk}
         </Link>
       </nav>
     </header>

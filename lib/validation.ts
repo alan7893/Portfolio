@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { EVENT_TYPES, EVENT_STATUSES } from "@/lib/constants";
+import { EVENT_TYPES, EVENT_STATUSES, BULK_MAX_PHOTOS } from "@/lib/constants";
 import { PHOTO_PURPOSES, PARTICIPATION_ROLES } from "@/lib/hk-portfolio";
 
 export const eventInputSchema = z.object({
@@ -22,6 +22,29 @@ export const eventInputSchema = z.object({
 });
 
 export type EventInput = z.infer<typeof eventInputSchema>;
+
+export const bulkEventItemSchema = z.object({
+  staged: z.string().uuid(),
+  title: z.string().trim().max(200).optional().or(z.literal("")),
+  description: z.string().trim().max(5000).optional().or(z.literal("")),
+  eventDate: z.string().min(1),
+  eventType: z.enum(EVENT_TYPES as [string, ...string[]]).optional(),
+  category: z.string().trim().max(60).optional().or(z.literal("")),
+  location: z.string().trim().max(200).optional().or(z.literal("")),
+  achievementRank: z.string().trim().max(120).optional().or(z.literal("")),
+  organiser: z.string().trim().max(160).optional().or(z.literal("")),
+  officialName: z.string().trim().max(200).optional().or(z.literal("")),
+  role: z.string().trim().max(40).optional().or(z.literal("")),
+  childReflection: z.string().trim().max(1000).optional().or(z.literal("")),
+  nameOnEvidence: z.boolean().optional(),
+  photoPurpose: z.string().trim().max(40).optional().or(z.literal("")),
+  tags: z.string().trim().max(500).optional().or(z.literal("")),
+});
+
+export const bulkImportSchema = z.object({
+  childId: z.string().uuid({ message: "childId must be a valid id" }),
+  items: z.array(bulkEventItemSchema).min(1).max(BULK_MAX_PHOTOS),
+});
 
 export const credentialsSchema = z.object({
   email: z.string().email(),
