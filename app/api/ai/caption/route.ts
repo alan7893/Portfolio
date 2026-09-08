@@ -2,10 +2,16 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { availableProviders, captionPhoto, AiError } from "@/lib/ai";
-import { collectUploadedFiles, validateFile } from "@/lib/uploads";
+import {
+  collectUploadedFiles,
+  collectStagedIds,
+  readStagedBytes,
+  validateFile,
+} from "@/lib/uploads";
 import { mimeFromName } from "@/lib/constants";
 import { checkRateLimit, registerFailedAttempt } from "@/lib/rateLimit";
 import { DEFAULT_LOCALE, normalizeLocale } from "@/lib/i18n";
+import { prepareVisionJpeg } from "@/lib/photo-vision";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -23,7 +29,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const userId = (session.user as { id?: string }).id ?? "anon";
+  const userId = session.user.id ?? "anon";
   const limit = checkRateLimit(`ai-caption:${userId}`);
   if (!limit.allowed) {
     return NextResponse.json(
@@ -37,33 +43,68 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Expected a photo upload." }, { status: 400 });
   }
 
-  const files = collectUploadedFiles(form, "file");
-  const file = files[0];
-  if (!file) {
-    return NextResponse.json({ error: "No photo attached." }, { status: 400 });
+  let original: Buffer | null = null;
+  const stagedId = collectStagedIds(form)[0];
+  if (stagedId) {
+    const staged = await readStagedBytes(userId, stagedId);
+    if (!staged) {
+      return NextResponse.json(
+        { error: "Photo was not found on the server. Please choose it again." },
+        { status: 400 },
+      );
+    }
+    if (!staged.meta.fileType.startsWith("image/")) {
+      return NextResponse.json(
+        { error: "AI caption works on photos (JPEG, PNG, WebP, HEIC)." },
+        { status: 400 },
+      );
+    }
+    original = staged.bytes;
+  } else {
+    const files = collectUploadedFiles(form, "file");
+    const file = files[0];
+    if (!file) {
+      return NextResponse.json({ error: "No photo attached." }, { status: 400 });
+    }
+    const err = validateFile(file);
+    if (err) {
+      return NextResponse.json({ error: "Unsupported photo." }, { status: 400 });
+    }
+    const mime = file.type || mimeFromName(file.name);
+    if (!mime.startsWith("image/")) {
+      return NextResponse.json(
+        { error: "AI caption works on photos (JPEG, PNG, WebP, HEIC)." },
+        { status: 400 },
+      );
+    }
+    original = Buffer.from(await file.arrayBuffer());
   }
-  const err = validateFile(file);
-  if (err) {
-    return NextResponse.json({ error: "Unsupported photo." }, { status: 400 });
-  }
-  const mime = file.type || mimeFromName(file.name);
-  if (!mime.startsWith("image/")) {
+
+  const locale = normalizeLocale(String(form.get("locale") ?? DEFAULT_LOCALE));
+
+  let vision;
+  try {
+    vision = await prepareVisionJpeg(original);
+  } catch {
     return NextResponse.json(
-      { error: "AI caption works on photos (JPEG, PNG, WebP, HEIC)." },
+      { error: "Could not read this photo for AI. Try JPEG or PNG." },
       { status: 400 },
     );
   }
 
-  const locale = normalizeLocale(String(form.get("locale") ?? DEFAULT_LOCALE));
-  const buf = Buffer.from(await file.arrayBuffer());
-
   try {
     const caption = await captionPhoto({
       locale,
-      mimeType: mime,
-      dataBase64: buf.toString("base64"),
+      mimeType: vision.mimeType,
+      dataBase64: vision.dataBase64,
     });
-    return NextResponse.json(caption);
+    return NextResponse.json({
+      title: caption.title,
+      category: caption.category,
+      eventType: caption.eventType,
+      description: caption.description,
+      tags: caption.tags,
+    });
   } catch (e) {
     registerFailedAttempt(`ai-caption:${userId}`);
     if (e instanceof AiError) {

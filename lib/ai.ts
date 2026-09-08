@@ -1,5 +1,5 @@
 import { buildAiMessages, type AiKind, type AiProvider, type ChildSummary } from "@/lib/ai-prompt";
-import { buildCaptionPrompt, parseCaptionJson, type PhotoCaption } from "@/lib/ai-caption";
+import { buildCaptionPrompt, parseCaptionJson, refineCaption, buildAwardDetectPrompt, parseAwardDetect, hasAwardObject, emptyAwardFacts, type PhotoCaption } from "@/lib/ai-caption";
 import type { Locale } from "@/lib/i18n";
 
 function runtimeEnv(name: string): string {
@@ -105,6 +105,7 @@ async function geminiNative(
   system: string,
   user: string,
   image?: { mimeType: string; dataBase64: string },
+  jsonMode = false,
 ): Promise<string> {
   const url = `${GEMINI_NATIVE_BASE}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const userParts: Array<Record<string, unknown>> = [{ text: user }];
@@ -119,7 +120,10 @@ async function geminiNative(
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: system }] },
       contents: [{ role: "user", parts: userParts }],
-      generationConfig: { temperature: 0.3 },
+      generationConfig: {
+        temperature: 0.3,
+        ...(jsonMode ? { responseMimeType: "application/json" } : {}),
+      },
     }),
     signal: AbortSignal.timeout(60_000),
   });
@@ -156,9 +160,16 @@ async function completeGemini(
   let last: unknown;
   for (const model of geminiModels()) {
     try {
-      return await geminiNative(key, model, system, user, image);
+      return await geminiNative(key, model, system, user, image, Boolean(image));
     } catch (err) {
       last = err;
+      if (image) {
+        try {
+          return await geminiNative(key, model, system, user, image, false);
+        } catch (err2) {
+          last = err2;
+        }
+      }
     }
     if (!image) {
       try {
@@ -200,10 +211,34 @@ export async function captionPhoto(opts: {
   mimeType: string;
   dataBase64: string;
 }): Promise<PhotoCaption & { provider: "gemini" }> {
-  const { system, user } = buildCaptionPrompt(opts.locale);
-  const raw = await completeGemini(system, user, {
+  const image = {
     mimeType: opts.mimeType,
     dataBase64: opts.dataBase64,
-  });
-  return { ...parseCaptionJson(raw), provider: "gemini" };
+  };
+  let facts = emptyAwardFacts();
+  try {
+    const detectPrompt = buildAwardDetectPrompt();
+    const detectRaw = await completeGemini(detectPrompt.system, detectPrompt.user, image);
+    facts = parseAwardDetect(detectRaw);
+  } catch {
+    facts = emptyAwardFacts();
+  }
+
+  const { system, user } = buildCaptionPrompt(opts.locale, facts);
+  const raw = await completeGemini(system, user, image);
+  const parsed = parseCaptionJson(raw);
+  if (hasAwardObject(parsed.facts)) {
+    facts = {
+      holdingMedal: facts.holdingMedal || parsed.facts.holdingMedal,
+      wearingMedal: facts.wearingMedal || parsed.facts.wearingMedal,
+      holdingTrophy: facts.holdingTrophy || parsed.facts.holdingTrophy,
+      isLesson: facts.isLesson && !hasAwardObject(parsed.facts),
+      sportHint: facts.sportHint || parsed.facts.sportHint,
+    };
+  }
+  const caption = refineCaption(parsed, opts.locale, facts);
+  if (!caption.title) {
+    throw new AiError("The model did not describe what is in the photo.", 502);
+  }
+  return { ...caption, provider: "gemini" };
 }

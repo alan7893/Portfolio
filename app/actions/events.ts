@@ -15,7 +15,6 @@ import {
   collectStagedIds,
   attachStagedFiles,
   readStagedFile,
-  filenameStem,
   mediaWriteErrorMessage,
 } from "@/lib/uploads";
 import type { SavedFile } from "@/lib/uploads";
@@ -153,10 +152,8 @@ export async function createEventAction(
   }
 
   const stagedIds = collectStagedIds(formData);
-  let stagedName = "";
   if (stagedIds.length > 0) {
     const first = await readStagedFile(userId, stagedIds[0]);
-    stagedName = first?.originalName ?? "";
     if (!first) {
       return {
         error: "Photos were not found on the server. Please choose them again.",
@@ -164,13 +161,14 @@ export async function createEventAction(
     }
   }
 
-  const title =
-    parsed.data.title ||
-    filenameStem(files[0]?.name ?? "") ||
-    filenameStem(stagedName) ||
-    "";
+  const title = parsed.data.title || "";
   if (!title) {
-    return { error: "Add a title, or upload a photo so AI can fill it." };
+    return {
+      error:
+        stagedIds.length || files.length
+          ? "Wait for AI to read the photo, or type a title."
+          : "Add a title, or upload a photo so AI can fill it.",
+    };
   }
 
   const child = await prisma.child.findUnique({

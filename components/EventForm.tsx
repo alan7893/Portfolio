@@ -121,7 +121,7 @@ export function EventForm({
     setCaptionStatus("loading");
     try {
       const body = new FormData();
-      body.append("file", image);
+      body.append("staged", nextIds[0]);
       body.append("locale", t.locale);
       const res = await fetch("/api/ai/caption", { method: "POST", body });
       const json = (await res.json().catch(() => ({}))) as {
@@ -324,6 +324,9 @@ export function EventForm({
         )}
         {captionStatus === "error" && (
           <p className="mt-2 text-sm text-amber-800">{t.events.captionFailed}</p>
+        )}
+        {(captionStatus === "loading" || captionStatus === "done") && (
+          <p className="mt-1 text-xs text-ink-700/50">{t.events.captionPrivacy}</p>
         )}
         {uploadStatus === "uploading" && (
           <p className="mt-2 text-sm text-brand-700">{t.upload.uploading}</p>
