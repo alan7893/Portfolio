@@ -234,6 +234,8 @@ export async function captionPhoto(opts: {
       holdingTrophy: facts.holdingTrophy || parsed.facts.holdingTrophy,
       isLesson: facts.isLesson && !hasAwardObject(parsed.facts),
       sportHint: facts.sportHint || parsed.facts.sportHint,
+      hasCertificate: facts.hasCertificate || parsed.facts.hasCertificate,
+      namePrinted: facts.namePrinted || parsed.facts.namePrinted,
     };
   }
   const caption = refineCaption(parsed, opts.locale, facts);

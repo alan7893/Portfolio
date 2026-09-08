@@ -17,7 +17,7 @@ export default async function EditEventPage({
   const [event, children] = await Promise.all([
     prisma.event.findUnique({
       where: { id },
-      include: { eventTags: { include: { tag: true } } },
+      include: { eventTags: { include: { tag: true } }, media: { select: { id: true } } },
     }),
     prisma.child.findMany({ orderBy: { name: "asc" } }),
   ]);
@@ -44,6 +44,13 @@ export default async function EditEventPage({
             category: event.category ?? "",
             location: event.location ?? "",
             achievementRank: event.achievementRank ?? "",
+            organiser: event.organiser ?? "",
+            officialName: event.officialName ?? "",
+            role: event.role ?? "",
+            childReflection: event.childReflection ?? "",
+            nameOnEvidence: event.nameOnEvidence,
+            photoPurpose: event.photoPurpose ?? "",
+            existingMediaCount: event.media.length,
             status: event.status,
             tags: event.eventTags.map((et) => et.tag.name).join(", "),
           }}

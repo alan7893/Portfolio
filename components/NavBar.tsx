@@ -14,6 +14,7 @@ type NavLabels = {
   timeline: string;
   children: string;
   ai: string;
+  guide: string;
   newEvent: string;
   signOut: string;
   allKids: string;
@@ -41,6 +42,7 @@ export function NavBar({
     { href: "/events", label: labels.events, exact: false },
     { href: "/timeline", label: labels.timeline, exact: false },
     { href: "/children", label: labels.children, exact: false },
+    { href: "/guide", label: labels.guide, exact: false },
     { href: "/ai", label: labels.ai, exact: false },
   ];
 

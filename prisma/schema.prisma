@@ -57,6 +57,12 @@ model Event {
   category        String?
   location        String?
   achievementRank String?     @map("achievement_rank")
+  organiser       String?
+  officialName    String?     @map("official_name")
+  role            String?
+  childReflection String?     @map("child_reflection")
+  nameOnEvidence  Boolean     @default(false) @map("name_on_evidence")
+  photoPurpose    String?     @map("photo_purpose")
   status          EventStatus @default(COMPLETED)
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")

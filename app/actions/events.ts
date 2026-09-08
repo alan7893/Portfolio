@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { eventInputSchema, parseTags } from "@/lib/validation";
+import { eventInputSchema, parseTags, parseNameOnEvidence, parsePhotoPurpose, parseParticipationRole } from "@/lib/validation";
 import type { ActionState } from "@/lib/action-state";
 import {
   deleteEventFiles,
@@ -41,6 +41,12 @@ function readEventForm(formData: FormData) {
     category: String(formData.get("category") ?? ""),
     location: String(formData.get("location") ?? ""),
     achievementRank: String(formData.get("achievementRank") ?? ""),
+    organiser: String(formData.get("organiser") ?? ""),
+    officialName: String(formData.get("officialName") ?? ""),
+    role: String(formData.get("role") ?? ""),
+    childReflection: String(formData.get("childReflection") ?? ""),
+    nameOnEvidence: String(formData.get("nameOnEvidence") ?? ""),
+    photoPurpose: String(formData.get("photoPurpose") ?? ""),
     status: String(formData.get("status") ?? "COMPLETED"),
     tags: String(formData.get("tags") ?? ""),
   };
@@ -189,6 +195,12 @@ export async function createEventAction(
       category: parsed.data.category || null,
       location: parsed.data.location || null,
       achievementRank: parsed.data.achievementRank || null,
+      organiser: parsed.data.organiser || null,
+      officialName: parsed.data.officialName || null,
+      role: parseParticipationRole(parsed.data.role),
+      childReflection: parsed.data.childReflection || null,
+      nameOnEvidence: parseNameOnEvidence(parsed.data.nameOnEvidence),
+      photoPurpose: parsePhotoPurpose(parsed.data.photoPurpose),
       status: parsed.data.status as never,
     },
   });
@@ -237,6 +249,12 @@ export async function updateEventAction(
       category: parsed.data.category || null,
       location: parsed.data.location || null,
       achievementRank: parsed.data.achievementRank || null,
+      organiser: parsed.data.organiser || null,
+      officialName: parsed.data.officialName || null,
+      role: parseParticipationRole(parsed.data.role),
+      childReflection: parsed.data.childReflection || null,
+      nameOnEvidence: parseNameOnEvidence(parsed.data.nameOnEvidence),
+      photoPurpose: parsePhotoPurpose(parsed.data.photoPurpose),
       status: parsed.data.status as never,
     },
   });

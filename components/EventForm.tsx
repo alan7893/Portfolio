@@ -6,7 +6,9 @@ import type { EventType, EventStatus } from "@prisma/client";
 import type { Dictionary } from "@/lib/i18n";
 import type { ActionState } from "@/lib/action-state";
 import { EVENT_TYPES, EVENT_STATUSES, CATEGORIES } from "@/lib/constants";
+import { PHOTO_PURPOSES, PARTICIPATION_ROLES } from "@/lib/hk-portfolio";
 import { FileUploader } from "./FileUploader";
+import { CaptureChecklist } from "./CaptureChecklist";
 
 type ChildOption = { value: string; label: string };
 
@@ -19,6 +21,13 @@ export type EventFormDefaults = {
   category?: string;
   location?: string;
   achievementRank?: string;
+  organiser?: string;
+  officialName?: string;
+  role?: string;
+  childReflection?: string;
+  nameOnEvidence?: boolean;
+  photoPurpose?: string;
+  existingMediaCount?: number;
   status?: EventStatus;
   tags?: string;
 };
@@ -61,6 +70,17 @@ export function EventForm({
   const [category, setCategory] = useState(defaults?.category ?? "");
   const [description, setDescription] = useState(defaults?.description ?? "");
   const [tags, setTags] = useState(defaults?.tags ?? "");
+  const [organiser, setOrganiser] = useState(defaults?.organiser ?? "");
+  const [officialName, setOfficialName] = useState(defaults?.officialName ?? "");
+  const [role, setRole] = useState(defaults?.role ?? "");
+  const [childReflection, setChildReflection] = useState(
+    defaults?.childReflection ?? "",
+  );
+  const [nameOnEvidence, setNameOnEvidence] = useState(
+    Boolean(defaults?.nameOnEvidence),
+  );
+  const [photoPurpose, setPhotoPurpose] = useState(defaults?.photoPurpose ?? "");
+  const [rank, setRank] = useState(defaults?.achievementRank ?? "");
   const [stagedIds, setStagedIds] = useState<string[]>([]);
   const [uploadStatus, setUploadStatus] = useState<
     "idle" | "uploading" | "done" | "error"
@@ -71,7 +91,11 @@ export function EventForm({
   >("idle");
   const userEditedTitle = useRef(Boolean(defaults?.title));
 
-  const showRank = eventType === "PRIZE" || eventType === "COMPETITION";
+  const showRank =
+    eventType === "PRIZE" ||
+    eventType === "COMPETITION" ||
+    photoPurpose === "medal" ||
+    photoPurpose === "certificate";
 
   async function onFiles(files: File[]) {
     const image = files.find(
@@ -130,6 +154,13 @@ export function EventForm({
         eventType?: EventType;
         description?: string;
         tags?: string[];
+        organiser?: string;
+        officialName?: string;
+        achievementRank?: string;
+        role?: string;
+        photoPurpose?: string;
+        nameOnEvidence?: boolean;
+        childReflection?: string;
         error?: string;
       };
       if (!res.ok) {
@@ -141,6 +172,15 @@ export function EventForm({
       if (json.description && !description) setDescription(json.description);
       if (json.eventType) setEventType(json.eventType);
       if (json.tags?.length && !tags) setTags(json.tags.join(", "));
+      if (json.organiser && !organiser) setOrganiser(json.organiser);
+      if (json.officialName && !officialName) setOfficialName(json.officialName);
+      if (json.achievementRank && !rank) setRank(json.achievementRank);
+      if (json.role && !role) setRole(json.role);
+      if (json.photoPurpose && !photoPurpose) setPhotoPurpose(json.photoPurpose);
+      if (json.nameOnEvidence) setNameOnEvidence(true);
+      if (json.childReflection && !childReflection) {
+        setChildReflection(json.childReflection);
+      }
       setCaptionStatus("done");
     } catch {
       setCaptionStatus("error");
@@ -250,6 +290,73 @@ export function EventForm({
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
+          <label className="label">{t.events.photoPurpose}</label>
+          <select
+            name="photoPurpose"
+            className="input"
+            value={photoPurpose}
+            onChange={(e) => setPhotoPurpose(e.target.value)}
+          >
+            <option value="">—</option>
+            {PHOTO_PURPOSES.map((p) => (
+              <option key={p} value={p}>
+                {t.photoPurposes[p]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="label">
+            {t.events.officialName}{" "}
+            <span className="text-xs text-ink-700/50">({t.common.optional})</span>
+          </label>
+          <input
+            name="officialName"
+            className="input"
+            value={officialName}
+            onChange={(e) => setOfficialName(e.target.value)}
+            placeholder={t.events.officialNamePlaceholder}
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label className="label">
+            {t.events.organiser}{" "}
+            <span className="text-xs text-ink-700/50">({t.common.optional})</span>
+          </label>
+          <input
+            name="organiser"
+            className="input"
+            value={organiser}
+            onChange={(e) => setOrganiser(e.target.value)}
+            placeholder={t.events.organiserPlaceholder}
+          />
+        </div>
+        <div>
+          <label className="label">
+            {t.events.role}{" "}
+            <span className="text-xs text-ink-700/50">({t.common.optional})</span>
+          </label>
+          <select
+            name="role"
+            className="input"
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+          >
+            <option value="">—</option>
+            {PARTICIPATION_ROLES.map((r) => (
+              <option key={r} value={r}>
+                {t.roles[r]}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
           <label className="label">
             {t.events.location}{" "}
             <span className="text-xs text-ink-700/50">({t.common.optional})</span>
@@ -267,11 +374,44 @@ export function EventForm({
               name="achievementRank"
               className="input"
               placeholder={t.events.rankPlaceholder}
-              defaultValue={defaults?.achievementRank ?? ""}
+              value={rank}
+              onChange={(e) => setRank(e.target.value)}
             />
           </div>
         )}
-        {!showRank && <input type="hidden" name="achievementRank" value="" />}
+        {!showRank && <input type="hidden" name="achievementRank" value={rank} />}
+      </div>
+
+      <label className="flex items-start gap-2 text-sm text-ink-800">
+        <input
+          type="checkbox"
+          name="nameOnEvidence"
+          value="true"
+          className="mt-1"
+          checked={nameOnEvidence}
+          onChange={(e) => setNameOnEvidence(e.target.checked)}
+        />
+        <span>
+          {t.events.nameOnEvidence}
+          <span className="mt-0.5 block text-xs text-ink-700/60">
+            {t.events.nameOnEvidenceHint}
+          </span>
+        </span>
+      </label>
+
+      <div>
+        <label className="label">
+          {t.events.childReflection}{" "}
+          <span className="text-xs text-ink-700/50">({t.common.optional})</span>
+        </label>
+        <textarea
+          name="childReflection"
+          className="input min-h-[72px]"
+          value={childReflection}
+          onChange={(e) => setChildReflection(e.target.value)}
+          maxLength={1000}
+        />
+        <p className="mt-1 text-xs text-ink-700/50">{t.events.childReflectionHint}</p>
       </div>
 
       <div>
@@ -299,6 +439,23 @@ export function EventForm({
         />
         <p className="mt-1 text-xs text-ink-700/50">{t.events.tagsHint}</p>
       </div>
+
+      <CaptureChecklist
+        t={t}
+        values={{
+          eventType,
+          photoPurpose,
+          officialName,
+          organiser,
+          role,
+          achievementRank: rank,
+          nameOnEvidence,
+          childReflection,
+          category,
+          hasMedia: stagedIds.length > 0 || (defaults?.existingMediaCount ?? 0) > 0,
+          description,
+        }}
+      />
 
       <div>
         <label className="label">{t.events.media}</label>

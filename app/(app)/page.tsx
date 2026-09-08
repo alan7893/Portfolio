@@ -79,6 +79,17 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
+      <Link
+        href="/guide"
+        className="card block p-5 transition hover:shadow-md"
+      >
+        <p className="text-sm font-semibold text-ink-900">{t.dashboard.guideCard}</p>
+        <p className="mt-1 text-sm text-ink-700/70">{t.dashboard.guideBlurb}</p>
+        <p className="mt-2 text-sm font-medium text-brand-700">
+          {t.dashboard.guideCta} →
+        </p>
+      </Link>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label={t.dashboard.totalEvents} value={total} accent="brand" />
         <StatCard
