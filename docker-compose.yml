@@ -36,6 +36,7 @@ services:
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.6-flash}
+      GEMINI_PAID_TIER: ${GEMINI_PAID_TIER:-}
       UPLOAD_DIR: /app/uploads
     volumes:
       - uploads:/app/uploads
