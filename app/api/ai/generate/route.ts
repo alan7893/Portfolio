@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { aiGenerateSchema } from "@/lib/validation";
 import { availableProviders, generatePortfolioAnalysis, AiError } from "@/lib/ai";
+import { normalizeAiKind } from "@/lib/hk-portfolio";
 import { checkRateLimit, registerFailedAttempt } from "@/lib/rateLimit";
 import { DEFAULT_LOCALE, type Locale } from "@/lib/i18n";
 
@@ -68,7 +69,7 @@ export async function POST(request: Request) {
   try {
     const result = await generatePortfolioAnalysis({
       provider: parsed.data.provider,
-      kind: parsed.data.kind,
+      kind: normalizeAiKind(parsed.data.kind),
       locale,
       child: {
         name: child.name,
@@ -83,6 +84,12 @@ export async function POST(request: Request) {
           category: e.category,
           location: e.location,
           achievementRank: e.achievementRank,
+          organiser: e.organiser,
+          officialName: e.officialName,
+          role: e.role,
+          childReflection: e.childReflection,
+          nameOnEvidence: e.nameOnEvidence,
+          photoPurpose: e.photoPurpose,
           status: e.status,
           tags: e.eventTags.map((et) => et.tag.name),
         })),

@@ -11,7 +11,24 @@ export default async function AiPage() {
   const [kids, activeId] = await Promise.all([
     prisma.child.findMany({
       orderBy: { name: "asc" },
-      include: { _count: { select: { events: true } } },
+      include: {
+        _count: { select: { events: true } },
+        events: {
+          select: {
+            eventType: true,
+            photoPurpose: true,
+            officialName: true,
+            organiser: true,
+            role: true,
+            achievementRank: true,
+            nameOnEvidence: true,
+            childReflection: true,
+            category: true,
+            description: true,
+            _count: { select: { media: true } },
+          },
+        },
+      },
     }),
     getActiveChildId(),
   ]);
@@ -27,6 +44,20 @@ export default async function AiPage() {
           id: c.id,
           name: c.name,
           eventCount: c._count.events,
+          birthDate: c.birthDate.toISOString().slice(0, 10),
+          events: c.events.map((e) => ({
+            eventType: e.eventType,
+            photoPurpose: e.photoPurpose,
+            officialName: e.officialName,
+            organiser: e.organiser,
+            role: e.role,
+            achievementRank: e.achievementRank,
+            nameOnEvidence: e.nameOnEvidence,
+            childReflection: e.childReflection,
+            category: e.category,
+            description: e.description,
+            hasMedia: e._count.media > 0,
+          })),
         }))}
         defaultChildId={activeId}
         providers={availableProviders()}

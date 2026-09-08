@@ -104,6 +104,13 @@ export async function POST(request: Request) {
       eventType: caption.eventType,
       description: caption.description,
       tags: caption.tags,
+      organiser: caption.organiser,
+      officialName: caption.officialName,
+      achievementRank: caption.achievementRank,
+      role: caption.role,
+      photoPurpose: caption.photoPurpose,
+      nameOnEvidence: caption.nameOnEvidence,
+      childReflection: caption.childReflection,
     });
   } catch (e) {
     registerFailedAttempt(`ai-caption:${userId}`);

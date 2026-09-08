@@ -36,12 +36,18 @@ async function main() {
       category: e.category,
       location: e.location,
       achievementRank: e.achievementRank,
+      organiser: e.organiser,
+      officialName: e.officialName,
+      role: e.role,
+      childReflection: e.childReflection,
+      nameOnEvidence: e.nameOnEvidence,
+      photoPurpose: e.photoPurpose,
       status: e.status,
       tags: e.eventTags.map((et) => et.tag.name),
     })),
   };
 
-  const prompt = buildAiMessages(summary, "portfolio", "zh-HK");
+  const prompt = buildAiMessages(summary, "p1", "zh-HK");
   console.log("prompt_user_chars", prompt.user.length);
 
   if (!process.env.DEEPSEEK_API_KEY) {
@@ -51,7 +57,7 @@ async function main() {
 
   const result = await generatePortfolioAnalysis({
     provider: "deepseek",
-    kind: "portfolio",
+    kind: "p1",
     locale: "zh-HK",
     child: summary,
   });

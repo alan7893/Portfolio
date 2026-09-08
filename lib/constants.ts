@@ -13,9 +13,12 @@ export const EVENT_STATUSES: EventStatus[] = ["PLANNED", "COMPLETED"];
 
 export const CATEGORIES = [
   "academic",
+  "language",
   "sports",
   "arts",
+  "music",
   "leadership",
+  "service",
   "family",
 ] as const;
 

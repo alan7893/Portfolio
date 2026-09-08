@@ -19,12 +19,18 @@ describe("buildAiMessages", () => {
             category: "arts",
             location: "文化中心",
             achievementRank: "冠軍",
+            organiser: "文化中心",
+            officialName: "兒童繪畫比賽",
+            role: "participant",
+            childReflection: "好開心",
+            nameOnEvidence: true,
+            photoPurpose: "certificate",
             status: "COMPLETED",
             tags: ["藝術"],
           },
         ],
       },
-      "portfolio",
+      "p1",
       "zh-HK",
     );
 
@@ -33,6 +39,8 @@ describe("buildAiMessages", () => {
     assert.match(user, /陳小明/);
     assert.match(user, /繪畫比賽冠軍/);
     assert.match(user, /冠軍/);
+    assert.match(user, /小一叩門/);
+    assert.match(user, /official: 兒童繪畫比賽/);
   });
 
   it("notes when a child has no events", () => {
@@ -49,5 +57,22 @@ describe("buildAiMessages", () => {
     );
     assert.match(user, /no events yet/);
     assert.match(user, /Ada/);
+  });
+
+  it("asks for JUPAS OEA fields and 10-item cap", () => {
+    const { user, system } = buildAiMessages(
+      {
+        name: "Ada",
+        birthDate: "2008-01-01",
+        school: null,
+        notes: null,
+        events: [],
+      },
+      "jupas",
+      "en",
+    );
+    assert.match(user, /JUPAS OEA/);
+    assert.match(user, /10 items/);
+    assert.match(system, /name-on-proof/);
   });
 });

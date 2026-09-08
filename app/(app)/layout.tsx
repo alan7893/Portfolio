@@ -37,6 +37,7 @@ export default async function AppLayout({
           timeline: t.nav.timeline,
           children: t.nav.children,
           ai: t.nav.ai,
+          guide: t.nav.guide,
           newEvent: t.nav.newEvent,
           signOut: t.nav.signOut,
           allKids: t.children.allKids,

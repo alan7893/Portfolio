@@ -54,6 +54,13 @@ describe("refineCaption", () => {
         eventType: "PHOTO",
         description: "小朋友手上拿住一塊游泳獎牌。",
         tags: ["游泳"],
+        organiser: "",
+        officialName: "",
+        achievementRank: "",
+        role: "",
+        photoPurpose: "",
+        nameOnEvidence: false,
+        childReflection: "",
       },
       "zh-HK",
     );
@@ -70,6 +77,13 @@ describe("refineCaption", () => {
         eventType: "PHOTO",
         description: "小朋友喺公園踩單車。",
         tags: [],
+        organiser: "",
+        officialName: "",
+        achievementRank: "",
+        role: "",
+        photoPurpose: "",
+        nameOnEvidence: false,
+        childReflection: "",
       },
       "zh-HK",
     );
@@ -85,6 +99,13 @@ describe("refineCaption", () => {
         eventType: "PHOTO",
         description: "小朋友喺泳池邊微笑。",
         tags: ["游泳"],
+        organiser: "",
+        officialName: "",
+        achievementRank: "",
+        role: "",
+        photoPurpose: "",
+        nameOnEvidence: false,
+        childReflection: "",
       },
       "zh-HK",
       {
@@ -93,6 +114,8 @@ describe("refineCaption", () => {
         holdingTrophy: false,
         isLesson: false,
         sportHint: "swimming",
+        hasCertificate: false,
+        namePrinted: false,
       },
     );
     assert.equal(cap.eventType, "PRIZE");
@@ -109,6 +132,27 @@ describe("parseAwardDetect", () => {
     assert.equal(facts.holdingMedal, true);
     assert.equal(hasAwardObject(facts), true);
     assert.equal(facts.sportHint, "swimming");
+  });
+
+  it("reads a printed name on a certificate", () => {
+    const facts = parseAwardDetect(
+      '{"hasCertificate":true,"namePrinted":true,"holdingMedal":false}',
+    );
+    assert.equal(facts.hasCertificate, true);
+    assert.equal(facts.namePrinted, true);
+  });
+});
+
+describe("HK admission caption fields", () => {
+  it("copies official name and name-on-evidence from JSON", () => {
+    const cap = parseCaptionJson(
+      '{"title":"游泳比賽得獎","category":"sports","eventType":"PRIZE","officialName":"分齡游泳錦標賽","organiser":"康文署","achievementRank":"金牌","role":"participant","photoPurpose":"medal","nameOnEvidence":true,"childReflection":"好開心","description":"手上兩塊獎牌","tags":["游泳"]}',
+    );
+    assert.equal(cap.officialName, "分齡游泳錦標賽");
+    assert.equal(cap.organiser, "康文署");
+    assert.equal(cap.photoPurpose, "medal");
+    assert.equal(cap.nameOnEvidence, true);
+    assert.equal(cap.role, "participant");
   });
 });
 

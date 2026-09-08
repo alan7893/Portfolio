@@ -1,4 +1,10 @@
 import { CATEGORIES, EVENT_TYPES } from "@/lib/constants";
+import {
+  PHOTO_PURPOSES,
+  PARTICIPATION_ROLES,
+  type PhotoPurpose,
+  type ParticipationRole,
+} from "@/lib/hk-portfolio";
 import type { EventType } from "@prisma/client";
 import type { Locale } from "@/lib/i18n";
 import { titleLooksLikeFilename } from "@/lib/photo-vision";
@@ -9,6 +15,13 @@ export type PhotoCaption = {
   eventType: EventType;
   description: string;
   tags: string[];
+  organiser: string;
+  officialName: string;
+  achievementRank: string;
+  role: ParticipationRole | "";
+  photoPurpose: PhotoPurpose | "";
+  nameOnEvidence: boolean;
+  childReflection: string;
 };
 
 export type AwardFacts = {
@@ -17,10 +30,14 @@ export type AwardFacts = {
   holdingTrophy: boolean;
   isLesson: boolean;
   sportHint: string;
+  hasCertificate: boolean;
+  namePrinted: boolean;
 };
 
 const CATEGORY_SET = new Set<string>(CATEGORIES);
 const TYPE_SET = new Set<string>(EVENT_TYPES);
+const PURPOSE_SET = new Set<string>(PHOTO_PURPOSES);
+const ROLE_SET = new Set<string>(PARTICIPATION_ROLES);
 
 function asBool(value: unknown): boolean {
   if (value === true || value === "true" || value === 1 || value === "1") return true;
@@ -34,11 +51,13 @@ export function emptyAwardFacts(): AwardFacts {
     holdingTrophy: false,
     isLesson: false,
     sportHint: "",
+    hasCertificate: false,
+    namePrinted: false,
   };
 }
 
 export function hasAwardObject(facts: AwardFacts): boolean {
-  return facts.holdingMedal || facts.wearingMedal || facts.holdingTrophy;
+  return facts.holdingMedal || facts.wearingMedal || facts.holdingTrophy || facts.hasCertificate;
 }
 
 export function parseAwardDetect(raw: string): AwardFacts {
@@ -56,23 +75,27 @@ export function parseAwardDetect(raw: string): AwardFacts {
     holdingTrophy: asBool(parsed.holdingTrophy) || asBool(parsed.hasTrophy),
     isLesson: asBool(parsed.isLesson),
     sportHint: String(parsed.sportHint ?? "").trim().slice(0, 40),
+    hasCertificate: asBool(parsed.hasCertificate) || asBool(parsed.hasAwardDocument),
+    namePrinted: asBool(parsed.namePrinted) || asBool(parsed.childNameVisible),
   };
 }
 
 export function buildAwardDetectPrompt(): { system: string; user: string } {
   const system = [
-    "You inspect family photos for prize objects. Accuracy matters more than speed.",
+    "You inspect family photos for prize objects and printed proof. Accuracy matters more than speed.",
     "Look at the child's hands, fingers, chest, neck, lanyard, and anything held up to the camera.",
     "A medal is a small round metal disc (gold, silver, bronze, or coloured), often on a ribbon or string. It can be tiny in the frame.",
     "If a round metallic prize is in a hand, on a palm, between fingers, or hanging on the chest, holdingMedal or wearingMedal is true.",
+    "hasCertificate is true if a paper certificate, award letter, or score sheet is the subject.",
+    "namePrinted is true only if a child's name is clearly readable on a medal, trophy plate, or certificate. Guessing a name is forbidden.",
     "When unsure between a coin-like medal and a toy, prefer holdingMedal=true if it looks like an award.",
-    "isLesson is true only if teaching is the main subject AND there is no medal or trophy.",
+    "isLesson is true only if teaching is the main subject AND there is no medal, trophy, or certificate.",
     "A pool, swim cap, or goggles without a medal is not automatically a lesson.",
-    "Return ONLY JSON with keys: holdingMedal, wearingMedal, holdingTrophy, isLesson, sportHint.",
+    "Return ONLY JSON with keys: holdingMedal, wearingMedal, holdingTrophy, hasCertificate, namePrinted, isLesson, sportHint.",
     "sportHint: short sport name if obvious (swimming, football, athletics), else empty string.",
   ].join(" ");
   const user =
-    "Detect prize objects in this photo. Return JSON only.";
+    "Detect prize objects and printed names in this photo. Return JSON only.";
   return { system, user };
 }
 
@@ -85,35 +108,41 @@ export function buildCaptionPrompt(
       ? "English"
       : "Hong Kong Cantonese (written 廣東話, not Mandarin)";
   const awardLock = hasAwardObject(facts)
-    ? `CONFIRMED: the child is holding or wearing a medal/trophy. eventType MUST be PRIZE. Title MUST be a competition win (e.g. 游泳比賽得獎), never a lesson/class. isLesson is false.`
+    ? `CONFIRMED: the child is holding or wearing a medal/trophy, or a certificate is visible. eventType MUST be PRIZE. Title MUST be a competition win (e.g. 游泳比賽得獎), never a lesson/class. isLesson is false.`
     : facts.isLesson
       ? "A class/lesson is possible only if no medal is present."
-      : "If you see a medal or trophy, eventType is PRIZE, not PHOTO and not a lesson.";
-  const sportLock = facts.sportHint
-    ? `Likely sport: ${facts.sportHint}.`
-    : "";
+      : "If you see a medal, trophy, or certificate, eventType is PRIZE, not PHOTO and not a lesson.";
+  const sportLock = facts.sportHint ? `Likely sport: ${facts.sportHint}.` : "";
+  const nameLock = facts.namePrinted
+    ? "A child's name is printed on the medal or certificate. Set nameOnEvidence true. Do not copy the name into the title unless it is clearly printed."
+    : "nameOnEvidence is true only if a name is clearly printed on a medal plate or certificate. Otherwise false.";
   const system = [
-    "You caption family photos of children for a private parent portfolio.",
+    "You caption family photos of children for a private Hong Kong school-admission portfolio.",
     "You receive only pixels. There is no filename, EXIF, GPS, or camera title.",
     "Judge the MAIN SUBJECT first: what the child is holding or doing. Ignore file names, watermarks, t-shirt prints, and pool signs.",
     awardLock,
     sportLock,
+    nameLock,
     "A small gold/silver disc in a hand is a medal even if the child is beside a pool.",
     "Never copy a file name such as IMG_1234, DSCF, PXL, Screenshot, or anything ending in .jpg/.heic.",
-    "Do not invent names, ages, schools, addresses, dates, or locations that are not clearly written in the picture.",
-    `Write title and description in ${lang}.`,
-    "Return ONLY compact JSON with keys: holdingMedal, wearingMedal, holdingTrophy, title, category, eventType, description, tags.",
+    "Do not invent names, ages, schools, addresses, dates, organisers, ranks, or locations that are not clearly written in the picture.",
+    "If printed text on a certificate or medal is readable, copy officialName, organiser, achievementRank, and year into the matching fields. If it is not readable, leave those fields empty.",
+    `Write title, description, and childReflection in ${lang}.`,
+    "Return ONLY compact JSON with keys: holdingMedal, wearingMedal, holdingTrophy, hasCertificate, namePrinted, nameOnEvidence, title, category, eventType, description, tags, organiser, officialName, achievementRank, role, photoPurpose, childReflection.",
     `category must be one of: ${CATEGORIES.join(", ")} (or empty string).`,
     `eventType must be one of: ${EVENT_TYPES.join(", ")}.`,
-    "eventType: PRIZE if an award object is visible; COMPETITION if a race/meet without a prize object; PHOTO only for ordinary snapshots.",
+    `photoPurpose must be one of: ${PHOTO_PURPOSES.join(", ")} (or empty string). Use medal, certificate, activity, lifestyle, work, or family.`,
+    `role must be one of: ${PARTICIPATION_ROLES.join(", ")} (or empty string). Default participant for a prize photo.`,
+    "eventType: PRIZE if an award object or certificate is visible; COMPETITION if a race/meet without a prize object; PHOTO only for ordinary snapshots.",
     "title: max 40 characters, specific, no emoji dump.",
     "description: one or two short sentences of what is visible, including any medal in the hands.",
+    "childReflection: one short sentence of what the child appears to be doing or feeling, only from the picture. Empty if unclear.",
     "tags: 0-4 short labels.",
   ]
     .filter(Boolean)
     .join(" ");
   const user =
-    "Look at the image pixels and fill the JSON. If you cannot see the image, return {\"title\":\"\",\"category\":\"\",\"eventType\":\"PHOTO\",\"description\":\"\",\"tags\":[],\"holdingMedal\":false,\"wearingMedal\":false,\"holdingTrophy\":false}.";
+    "Look at the image pixels and fill the JSON. If you cannot see the image, return {\"title\":\"\",\"category\":\"\",\"eventType\":\"PHOTO\",\"description\":\"\",\"tags\":[],\"holdingMedal\":false,\"wearingMedal\":false,\"holdingTrophy\":false,\"hasCertificate\":false,\"namePrinted\":false,\"nameOnEvidence\":false,\"organiser\":\"\",\"officialName\":\"\",\"achievementRank\":\"\",\"role\":\"\",\"photoPurpose\":\"\",\"childReflection\":\"\"}.";
   return { system, user };
 }
 
@@ -134,11 +163,16 @@ export function refineCaption(
   const hasAward = hasAwardObject(facts) || AWARD_RE.test(blob);
   const hasCompetition = COMPETITION_RE.test(blob);
   const hasSwim = SWIM_RE.test(blob) || /swim/i.test(facts.sportHint);
-  let { title, eventType, category } = caption;
+  let { title, eventType, category, photoPurpose, nameOnEvidence, role } = caption;
 
   if (hasAward) {
     eventType = "PRIZE";
     if (!category) category = "sports";
+    if (!photoPurpose) {
+      photoPurpose = facts.hasCertificate ? "certificate" : "medal";
+    }
+    if (!role) role = "participant";
+    if (facts.namePrinted) nameOnEvidence = true;
     if (!title || LESSON_RE.test(title) || titleLooksLikeFilename(title) || !AWARD_RE.test(title)) {
       title =
         locale === "en"
@@ -151,13 +185,26 @@ export function refineCaption(
     }
   } else if (hasCompetition && (eventType === "PHOTO" || eventType === "OTHER")) {
     eventType = "COMPETITION";
+    if (!photoPurpose) photoPurpose = "activity";
     if (hasSwim && (!title || LESSON_RE.test(title))) {
       title = locale === "en" ? "Swimming competition" : "游泳比賽";
     }
     if (hasSwim && !category) category = "sports";
+  } else if (!photoPurpose && eventType === "PHOTO") {
+    photoPurpose = category === "family" ? "family" : "lifestyle";
   }
 
-  return { ...caption, title, eventType, category };
+  return { ...caption, title, eventType, category, photoPurpose, nameOnEvidence, role };
+}
+
+function asPurpose(value: unknown): PhotoPurpose | "" {
+  const raw = String(value ?? "").trim().toLowerCase();
+  return PURPOSE_SET.has(raw) ? (raw as PhotoPurpose) : "";
+}
+
+function asRole(value: unknown): ParticipationRole | "" {
+  const raw = String(value ?? "").trim().toLowerCase();
+  return ROLE_SET.has(raw) ? (raw as ParticipationRole) : "";
 }
 
 export function parseCaptionJson(raw: string): PhotoCaption & { facts: AwardFacts } {
@@ -192,6 +239,13 @@ export function parseCaptionJson(raw: string): PhotoCaption & { facts: AwardFact
     eventType: TYPE_SET.has(typeRaw) ? (typeRaw as EventType) : "PHOTO",
     description: String(parsed.description ?? "").trim().slice(0, 500),
     tags,
+    organiser: String(parsed.organiser ?? parsed.organizer ?? "").trim().slice(0, 160),
+    officialName: String(parsed.officialName ?? parsed.awardName ?? "").trim().slice(0, 200),
+    achievementRank: String(parsed.achievementRank ?? parsed.rank ?? "").trim().slice(0, 120),
+    role: asRole(parsed.role),
+    photoPurpose: asPurpose(parsed.photoPurpose),
+    nameOnEvidence: asBool(parsed.nameOnEvidence) || asBool(parsed.namePrinted),
+    childReflection: String(parsed.childReflection ?? "").trim().slice(0, 1000),
     facts: parseAwardDetect(jsonText),
   };
 }

@@ -3,9 +3,38 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n";
-import type { AiKind, AiProvider } from "@/lib/ai-prompt";
+import type { AiProvider } from "@/lib/ai-prompt";
+import {
+  AI_KINDS,
+  type AiKind,
+  suggestedTrack,
+  trackWarnings,
+  type TrackWarning,
+} from "@/lib/hk-portfolio";
 
-type ChildOption = { id: string; name: string; eventCount: number };
+type EventFact = {
+  eventType: string;
+  photoPurpose: string | null;
+  officialName: string | null;
+  organiser: string | null;
+  role: string | null;
+  achievementRank: string | null;
+  nameOnEvidence: boolean;
+  childReflection: string | null;
+  category: string | null;
+  description: string | null;
+  hasMedia: boolean;
+};
+
+type ChildOption = {
+  id: string;
+  name: string;
+  eventCount: number;
+  birthDate: string;
+  events: EventFact[];
+};
+
+const KIND_ORDER: AiKind[] = [...AI_KINDS];
 
 export function AiAnalysisPanel({
   kids,
@@ -30,11 +59,12 @@ export function AiAnalysisPanel({
     defaultChildId ?? kids[0]?.id ?? "",
   );
   const [provider, setProvider] = useState<AiProvider>(firstEnabled ?? "gemini");
-  const [kind, setKind] = useState<AiKind>("portfolio");
+  const [kind, setKind] = useState<AiKind>("p1");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<string>("");
   const [copied, setCopied] = useState(false);
+  const [kindTouched, setKindTouched] = useState(false);
 
   useEffect(() => {
     if (!childId && kids[0]?.id) {
@@ -46,6 +76,20 @@ export function AiAnalysisPanel({
     () => kids.find((c) => c.id === childId),
     [kids, childId],
   );
+
+  const suggested = selected
+    ? suggestedTrack(selected.birthDate)
+    : "p1";
+
+  useEffect(() => {
+    if (!kindTouched && selected) {
+      setKind(suggestedTrack(selected.birthDate));
+    }
+  }, [kindTouched, selected]);
+
+  const warnings: TrackWarning[] = selected
+    ? trackWarnings(kind, selected.events)
+    : [];
 
   const anyProvider = providers.gemini || providers.deepseek;
 
@@ -111,7 +155,10 @@ export function AiAnalysisPanel({
           <select
             className="input"
             value={childId}
-            onChange={(e) => setChildId(e.target.value)}
+            onChange={(e) => {
+              setChildId(e.target.value);
+              setKindTouched(false);
+            }}
           >
             {kids.map((c) => (
               <option key={c.id} value={c.id}>
@@ -142,14 +189,26 @@ export function AiAnalysisPanel({
           <select
             className="input"
             value={kind}
-            onChange={(e) => setKind(e.target.value as AiKind)}
+            onChange={(e) => {
+              setKindTouched(true);
+              setKind(e.target.value as AiKind);
+            }}
           >
-            <option value="portfolio">{t.ai.kinds.portfolio}</option>
-            <option value="testimonial">{t.ai.kinds.testimonial}</option>
-            <option value="memory">{t.ai.kinds.memory}</option>
+            {KIND_ORDER.map((k) => (
+              <option key={k} value={k}>
+                {t.ai.kinds[k]}
+              </option>
+            ))}
           </select>
+          <p className="mt-1 text-xs text-ink-700/60">
+            {interpolate(t.ai.suggested, { kind: t.ai.kinds[suggested] })}
+          </p>
         </div>
       </div>
+
+      <p className="rounded-xl border border-black/5 bg-white/70 px-4 py-3 text-sm text-ink-700/80">
+        {t.ai.kindHints[kind]}
+      </p>
 
       {!anyProvider && (
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
@@ -161,6 +220,17 @@ export function AiAnalysisPanel({
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
           {t.ai.needEvents}
         </p>
+      )}
+
+      {warnings.length > 0 && selected && selected.eventCount > 0 && (
+        <div className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <p className="font-medium">{t.ai.warningsTitle}</p>
+          <ul className="mt-1 list-disc pl-5">
+            {warnings.map((w) => (
+              <li key={w}>{t.ai.warnings[w]}</li>
+            ))}
+          </ul>
+        </div>
       )}
 
       <div className="flex items-center gap-3">

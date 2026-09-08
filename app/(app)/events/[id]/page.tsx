@@ -6,6 +6,8 @@ import { formatDate } from "@/lib/format";
 import { TypeBadge, StatusBadge } from "@/components/TypeBadge";
 import { MediaGallery } from "@/components/MediaGallery";
 import { DeleteEventButton } from "@/components/DeleteEventButton";
+import { EvidenceStatus } from "@/components/CaptureChecklist";
+import { wuYuForCategory } from "@/lib/hk-portfolio";
 import { deleteEventAction } from "@/app/actions/events";
 
 export const dynamic = "force-dynamic";
@@ -87,11 +89,75 @@ export default async function EventDetailPage({
           </div>
         )}
 
+        {(event.officialName ||
+          event.organiser ||
+          event.role ||
+          event.photoPurpose) && (
+          <dl className="mt-4 grid gap-2 text-sm text-ink-800 sm:grid-cols-2">
+            {event.officialName && (
+              <>
+                <dt className="text-ink-700/60">{t.events.officialName}</dt>
+                <dd>{event.officialName}</dd>
+              </>
+            )}
+            {event.organiser && (
+              <>
+                <dt className="text-ink-700/60">{t.events.organiser}</dt>
+                <dd>{event.organiser}</dd>
+              </>
+            )}
+            {event.role && (
+              <>
+                <dt className="text-ink-700/60">{t.events.role}</dt>
+                <dd>{(t.roles as Record<string, string>)[event.role] ?? event.role}</dd>
+              </>
+            )}
+            {event.photoPurpose && (
+              <>
+                <dt className="text-ink-700/60">{t.events.photoPurpose}</dt>
+                <dd>
+                  {(t.photoPurposes as Record<string, string>)[event.photoPurpose] ??
+                    event.photoPurpose}
+                </dd>
+              </>
+            )}
+          </dl>
+        )}
+
+        {event.childReflection && (
+          <p className="mt-4 rounded-xl bg-brand-50 px-3 py-2 text-sm text-ink-800">
+            <span className="font-medium">{t.events.childReflection}：</span>
+            {event.childReflection}
+          </p>
+        )}
+
         {event.description && (
           <p className="mt-4 whitespace-pre-wrap text-ink-800">
             {event.description}
           </p>
         )}
+
+        <div className="mt-4 space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-ink-700/50">
+            {t.events.evidenceTitle}
+          </p>
+          <EvidenceStatus
+            t={t}
+            values={{
+              eventType: event.eventType,
+              photoPurpose: event.photoPurpose,
+              officialName: event.officialName,
+              organiser: event.organiser,
+              role: event.role,
+              achievementRank: event.achievementRank,
+              nameOnEvidence: event.nameOnEvidence,
+              childReflection: event.childReflection,
+              category: event.category,
+              hasMedia: event.media.length > 0,
+              description: event.description,
+            }}
+          />
+        </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
           {categoryLabel && (
@@ -99,6 +165,14 @@ export default async function EventDetailPage({
               {categoryLabel}
             </span>
           )}
+          {wuYuForCategory(event.category).map((pillar) => (
+            <span
+              key={pillar}
+              className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs text-emerald-800"
+            >
+              {t.events.wuYu} · {t.wuYu[pillar]}
+            </span>
+          ))}
           {event.eventTags.map((et) => (
             <span
               key={et.tagId}
