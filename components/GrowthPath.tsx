@@ -6,15 +6,21 @@ export function GrowthPath({
   t,
   current,
   counts,
+  childName,
 }: {
   t: Dictionary;
   current: LifeStage;
   counts: Record<LifeStage, number>;
+  childName?: string;
 }) {
   return (
     <section className="card space-y-3 p-5">
       <div>
-        <h2 className="text-lg font-semibold text-ink-900">{t.dashboard.growthTitle}</h2>
+        <h2 className="text-lg font-semibold text-ink-900">
+          {childName
+            ? interpolate(t.dashboard.growthOf, { name: childName })
+            : t.dashboard.growthTitle}
+        </h2>
         <p className="text-sm text-ink-700/70">{t.dashboard.growthHint}</p>
         <p className="mt-1 text-sm font-medium text-brand-700">
           {interpolate(t.dashboard.currentStage, { stage: t.stages[current] })}

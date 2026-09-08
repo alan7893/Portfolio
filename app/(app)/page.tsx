@@ -22,15 +22,22 @@ export default async function DashboardPage() {
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   const childWhere = await childEventWhere();
   const activeId = await getActiveChildId();
-  const [childCount, activeChild] = await Promise.all([
+  const [childCount, pathKids] = await Promise.all([
     prisma.child.count(),
-    activeId
-      ? prisma.child.findUnique({
-          where: { id: activeId },
-          select: { name: true, birthDate: true },
-        })
-      : Promise.resolve(null),
+    prisma.child.findMany({
+      where: activeId ? { id: activeId } : {},
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        birthDate: true,
+        events: { select: { eventDate: true } },
+      },
+    }),
   ]);
+  const activeChild = activeId
+    ? (pathKids.find((k) => k.id === activeId) ?? null)
+    : null;
 
   if (childCount === 0) {
     return (
@@ -45,7 +52,7 @@ export default async function DashboardPage() {
     );
   }
 
-  const [total, thisMonth, upcoming, latestPhotos, stageEvents] = await Promise.all([
+  const [total, thisMonth, upcoming, latestPhotos] = await Promise.all([
     prisma.event.count({ where: childWhere }),
     prisma.event.count({
       where: { ...childWhere, eventDate: { gte: monthStart, lt: monthEnd } },
@@ -59,10 +66,6 @@ export default async function DashboardPage() {
       orderBy: { createdAt: "desc" },
       take: 6,
       include: { event: true },
-    }),
-    prisma.event.findMany({
-      where: childWhere,
-      select: { eventDate: true },
     }),
   ]);
 
@@ -99,13 +102,15 @@ export default async function DashboardPage() {
         </p>
       </Link>
 
-      {activeChild && (
+      {pathKids.map((kid) => (
         <GrowthPath
+          key={kid.id}
           t={t}
-          current={suggestedTrack(activeChild.birthDate)}
-          counts={stageCounts(activeChild.birthDate, stageEvents)}
+          current={suggestedTrack(kid.birthDate)}
+          counts={stageCounts(kid.birthDate, kid.events)}
+          childName={pathKids.length > 1 ? kid.name : undefined}
         />
-      )}
+      ))}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label={t.dashboard.totalEvents} value={total} accent="brand" />
