@@ -1,5 +1,5 @@
 import { buildAiMessages, type AiKind, type AiProvider, type ChildSummary } from "@/lib/ai-prompt";
-import { buildCaptionPrompt, parseCaptionJson, type PhotoCaption } from "@/lib/ai-caption";
+import { buildCaptionPrompt, parseCaptionJson, refineCaption, type PhotoCaption } from "@/lib/ai-caption";
 import type { Locale } from "@/lib/i18n";
 
 function runtimeEnv(name: string): string {
@@ -216,7 +216,7 @@ export async function captionPhoto(opts: {
     mimeType: opts.mimeType,
     dataBase64: opts.dataBase64,
   });
-  const caption = parseCaptionJson(raw);
+  const caption = refineCaption(parseCaptionJson(raw), opts.locale);
   if (!caption.title) {
     throw new AiError("The model did not describe what is in the photo.", 502);
   }

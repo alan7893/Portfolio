@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { parseCaptionJson } from "./ai-caption";
+import { parseCaptionJson, refineCaption } from "./ai-caption";
 import { titleLooksLikeFilename } from "./photo-vision";
 
 describe("parseCaptionJson", () => {
@@ -44,3 +44,37 @@ describe("titleLooksLikeFilename", () => {
     assert.equal(titleLooksLikeFilename("公園踏單車"), false);
   });
 });
+
+describe("refineCaption", () => {
+  it("treats a swimming medal as a competition prize, not a lesson", () => {
+    const cap = refineCaption(
+      {
+        title: "游泳課",
+        category: "sports",
+        eventType: "PHOTO",
+        description: "小朋友手上拿住一塊游泳獎牌。",
+        tags: ["游泳"],
+      },
+      "zh-HK",
+    );
+    assert.equal(cap.eventType, "PRIZE");
+    assert.equal(cap.title, "游泳比賽得獎");
+    assert.equal(cap.category, "sports");
+  });
+
+  it("keeps an ordinary snapshot as PHOTO", () => {
+    const cap = refineCaption(
+      {
+        title: "公園踏單車",
+        category: "family",
+        eventType: "PHOTO",
+        description: "小朋友喺公園踩單車。",
+        tags: [],
+      },
+      "zh-HK",
+    );
+    assert.equal(cap.eventType, "PHOTO");
+    assert.equal(cap.title, "公園踏單車");
+  });
+});
+
