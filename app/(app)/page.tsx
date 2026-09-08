@@ -8,6 +8,8 @@ import { StatCard } from "@/components/StatCard";
 import { EmptyState } from "@/components/EmptyState";
 import { formatDate } from "@/lib/format";
 import { childEventWhere, getActiveChildId } from "@/lib/child.server";
+import { GrowthPath } from "@/components/GrowthPath";
+import { stageCounts, suggestedTrack } from "@/lib/hk-portfolio";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +25,10 @@ export default async function DashboardPage() {
   const [childCount, activeChild] = await Promise.all([
     prisma.child.count(),
     activeId
-      ? prisma.child.findUnique({ where: { id: activeId }, select: { name: true } })
+      ? prisma.child.findUnique({
+          where: { id: activeId },
+          select: { name: true, birthDate: true },
+        })
       : Promise.resolve(null),
   ]);
 
@@ -40,7 +45,7 @@ export default async function DashboardPage() {
     );
   }
 
-  const [total, thisMonth, upcoming, latestPhotos] = await Promise.all([
+  const [total, thisMonth, upcoming, latestPhotos, stageEvents] = await Promise.all([
     prisma.event.count({ where: childWhere }),
     prisma.event.count({
       where: { ...childWhere, eventDate: { gte: monthStart, lt: monthEnd } },
@@ -54,6 +59,10 @@ export default async function DashboardPage() {
       orderBy: { createdAt: "desc" },
       take: 6,
       include: { event: true },
+    }),
+    prisma.event.findMany({
+      where: childWhere,
+      select: { eventDate: true },
     }),
   ]);
 
@@ -89,6 +98,14 @@ export default async function DashboardPage() {
           {t.dashboard.guideCta} →
         </p>
       </Link>
+
+      {activeChild && (
+        <GrowthPath
+          t={t}
+          current={suggestedTrack(activeChild.birthDate)}
+          counts={stageCounts(activeChild.birthDate, stageEvents)}
+        />
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label={t.dashboard.totalEvents} value={total} accent="brand" />

@@ -11,6 +11,7 @@ import {
   trackWarnings,
   type TrackWarning,
 } from "@/lib/hk-portfolio";
+import type { PrivacySettings } from "@/lib/privacy";
 
 type EventFact = {
   eventType: string;
@@ -42,16 +43,21 @@ export function AiAnalysisPanel({
   providers,
   locale,
   t,
+  privacy,
 }: {
   kids: ChildOption[];
   defaultChildId: string | null;
   providers: Record<AiProvider, boolean>;
   locale: Locale;
   t: Dictionary;
+  privacy: PrivacySettings;
 }) {
-  const firstEnabled: AiProvider | null = providers.gemini
+  const geminiOn = providers.gemini && privacy.aiGenerateEnabled;
+  const deepseekOn =
+    providers.deepseek && privacy.aiGenerateEnabled && privacy.aiAllowDeepseek;
+  const firstEnabled: AiProvider | null = geminiOn
     ? "gemini"
-    : providers.deepseek
+    : deepseekOn
       ? "deepseek"
       : null;
 
@@ -91,7 +97,7 @@ export function AiAnalysisPanel({
     ? trackWarnings(kind, selected.events)
     : [];
 
-  const anyProvider = providers.gemini || providers.deepseek;
+  const anyProvider = geminiOn || deepseekOn;
 
   async function generate() {
     const id = childId || kids[0]?.id || "";
@@ -174,13 +180,13 @@ export function AiAnalysisPanel({
             value={provider}
             onChange={(e) => setProvider(e.target.value as AiProvider)}
           >
-            <option value="gemini" disabled={!providers.gemini}>
+            <option value="gemini" disabled={!geminiOn}>
               {t.ai.gemini}
-              {!providers.gemini ? " —" : ""}
+              {!providers.gemini ? " —" : !privacy.aiGenerateEnabled ? " —" : ""}
             </option>
-            <option value="deepseek" disabled={!providers.deepseek}>
+            <option value="deepseek" disabled={!deepseekOn}>
               {t.ai.deepseek}
-              {!providers.deepseek ? " —" : ""}
+              {!providers.deepseek || !privacy.aiAllowDeepseek ? " —" : ""}
             </option>
           </select>
         </div>
@@ -210,7 +216,22 @@ export function AiAnalysisPanel({
         {t.ai.kindHints[kind]}
       </p>
 
-      {!anyProvider && (
+      {!privacy.aiGenerateEnabled && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          {t.ai.generateOff}{" "}
+          <a href="/settings" className="underline">
+            {t.events.privacyLink}
+          </a>
+        </p>
+      )}
+
+      {privacy.aiGenerateEnabled && providers.deepseek && !privacy.aiAllowDeepseek && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          {t.ai.deepseekOff}
+        </p>
+      )}
+
+      {!anyProvider && privacy.aiGenerateEnabled && (
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
           {t.ai.noProvider}
         </p>

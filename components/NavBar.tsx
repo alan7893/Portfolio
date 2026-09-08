@@ -16,6 +16,7 @@ type NavLabels = {
   ai: string;
   guide: string;
   newEvent: string;
+  settings: string;
   signOut: string;
   allKids: string;
   switcher: string;
@@ -44,6 +45,7 @@ export function NavBar({
     { href: "/children", label: labels.children, exact: false },
     { href: "/guide", label: labels.guide, exact: false },
     { href: "/ai", label: labels.ai, exact: false },
+    { href: "/settings", label: labels.settings, exact: false },
   ];
 
   function isActive(href: string, exact: boolean) {
@@ -91,6 +93,9 @@ export function NavBar({
           />
           <Link href="/events/new" className="btn-primary hidden sm:inline-flex">
             + {labels.newEvent}
+          </Link>
+          <Link href="/settings" className="btn-ghost hidden md:inline-flex">
+            {labels.settings}
           </Link>
           <LangSwitcher locale={locale} />
           <SignOutButton label={labels.signOut} />

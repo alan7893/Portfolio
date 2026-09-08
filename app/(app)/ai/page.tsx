@@ -3,12 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { getActiveChildId } from "@/lib/child.server";
 import { availableProviders } from "@/lib/ai";
 import { AiAnalysisPanel } from "@/components/AiAnalysisPanel";
+import { getPrivacySettings } from "@/lib/privacy.server";
 
 export const dynamic = "force-dynamic";
 
 export default async function AiPage() {
   const { locale, t } = await getI18n();
-  const [kids, activeId] = await Promise.all([
+  const [kids, activeId, privacy] = await Promise.all([
     prisma.child.findMany({
       orderBy: { name: "asc" },
       include: {
@@ -31,6 +32,7 @@ export default async function AiPage() {
       },
     }),
     getActiveChildId(),
+    getPrivacySettings(),
   ]);
 
   return (
@@ -61,6 +63,7 @@ export default async function AiPage() {
         }))}
         defaultChildId={activeId}
         providers={availableProviders()}
+        privacy={privacy}
         locale={locale}
         t={t}
       />

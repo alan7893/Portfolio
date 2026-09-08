@@ -6,6 +6,7 @@ import { formatDate, monthLabel } from "@/lib/format";
 import { TypeBadge, StatusBadge } from "@/components/TypeBadge";
 import { TimelineTabs } from "@/components/TimelineTabs";
 import { childEventWhere } from "@/lib/child.server";
+import { LIFE_STAGES, stageAtDate } from "@/lib/hk-portfolio";
 
 export const dynamic = "force-dynamic";
 
@@ -25,14 +26,24 @@ export default async function TimelinePage({
 }) {
   const { locale, t } = await getI18n();
   const sp = await searchParams;
-  const tab = sp.tab && sp.tab in TAB_FILTERS ? sp.tab : "all";
+  const requested = sp.tab ?? "all";
+  const isStageTab = (LIFE_STAGES as readonly string[]).includes(requested);
+  const tab = isStageTab || requested in TAB_FILTERS ? requested : "all";
   const childWhere = await childEventWhere();
 
-  const events = await prisma.event.findMany({
-    where: { ...TAB_FILTERS[tab], ...childWhere },
+  const eventsRaw = await prisma.event.findMany({
+    where: {
+      ...(isStageTab ? {} : TAB_FILTERS[tab] ?? {}),
+      ...childWhere,
+    },
     include: { media: true, child: true },
     orderBy: { eventDate: "desc" },
   });
+  const events = isStageTab
+    ? eventsRaw.filter(
+        (e) => stageAtDate(e.child.birthDate, e.eventDate) === tab,
+      )
+    : eventsRaw;
 
   // Group by year -> month
   const groups = new Map<
@@ -56,6 +67,11 @@ export default async function TimelinePage({
     { key: "competitions", label: t.timeline.tabs.competitions },
     { key: "milestones", label: t.timeline.tabs.milestones },
     { key: "upcoming", label: t.timeline.tabs.upcoming },
+    { key: "kinder", label: t.timeline.tabs.kinder },
+    { key: "p1", label: t.timeline.tabs.p1 },
+    { key: "s1", label: t.timeline.tabs.s1 },
+    { key: "jupas", label: t.timeline.tabs.jupas },
+    { key: "cv", label: t.timeline.tabs.cv },
   ];
 
   return (

@@ -39,6 +39,7 @@ export default async function AppLayout({
           ai: t.nav.ai,
           guide: t.nav.guide,
           newEvent: t.nav.newEvent,
+          settings: t.nav.settings,
           signOut: t.nav.signOut,
           allKids: t.children.allKids,
           switcher: t.children.switcher,

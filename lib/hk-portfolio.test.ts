@@ -7,13 +7,19 @@ import {
   normalizeAiKind,
   wuYuCoverage,
   trackWarnings,
+  stageAtDate,
+  stageCounts,
 } from "./hk-portfolio";
 
 const now = new Date("2026-09-08T00:00:00Z");
 
 describe("suggestedTrack", () => {
-  it("maps kindergarten age to 小一", () => {
-    assert.equal(suggestedTrack("2021-09-02", now), "p1");
+  it("maps kindergarten age to kindergarten", () => {
+    assert.equal(suggestedTrack("2021-09-02", now), "kinder");
+  });
+
+  it("maps P1 interview age to 小一", () => {
+    assert.equal(suggestedTrack("2020-06-01", now), "p1");
   });
 
   it("maps late primary to 中一", () => {
@@ -22,6 +28,10 @@ describe("suggestedTrack", () => {
 
   it("maps senior secondary to JUPAS", () => {
     assert.equal(suggestedTrack("2008-01-15", now), "jupas");
+  });
+
+  it("maps adulthood to a growing CV", () => {
+    assert.equal(suggestedTrack("2004-01-15", now), "cv");
   });
 });
 
@@ -112,5 +122,23 @@ describe("trackWarnings", () => {
       hasMedia: true,
     }));
     assert.ok(trackWarnings("jupas", events).includes("overTenAwards"));
+  });
+});
+
+describe("stageAtDate", () => {
+  it("keeps a kindergarten photo in kindergarten after the child grows", () => {
+    assert.equal(stageAtDate("2021-09-02", "2025-06-01"), "kinder");
+    assert.equal(suggestedTrack("2021-09-02", new Date("2032-09-08")), "s1");
+  });
+});
+
+describe("stageCounts", () => {
+  it("buckets events by age at the event, not today", () => {
+    const counts = stageCounts("2021-09-02", [
+      { eventDate: "2025-03-01" },
+      { eventDate: "2028-03-01" },
+    ]);
+    assert.equal(counts.kinder, 1);
+    assert.equal(counts.p1, 1);
   });
 });

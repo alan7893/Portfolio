@@ -35,6 +35,7 @@ export async function GET(
         "Content-Type": media.fileType || "application/octet-stream",
         "Content-Length": String(media.sizeBytes),
         "Cache-Control": "private, max-age=3600",
+        "X-Robots-Tag": "noindex, nofollow",
         "Content-Disposition": `inline; filename="${encodeURIComponent(
           media.originalName,
         )}"`,

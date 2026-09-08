@@ -4,7 +4,9 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { aiGenerateSchema } from "@/lib/validation";
 import { availableProviders, generatePortfolioAnalysis, AiError } from "@/lib/ai";
-import { normalizeAiKind } from "@/lib/hk-portfolio";
+import { normalizeAiKind, stageAtDate } from "@/lib/hk-portfolio";
+import { getPrivacySettings } from "@/lib/privacy.server";
+import { displayChildName, redactName } from "@/lib/privacy";
 import { checkRateLimit, registerFailedAttempt } from "@/lib/rateLimit";
 import { DEFAULT_LOCALE, type Locale } from "@/lib/i18n";
 
@@ -41,6 +43,20 @@ export async function POST(request: Request) {
     );
   }
 
+  const privacy = await getPrivacySettings();
+  if (!privacy.aiGenerateEnabled) {
+    return NextResponse.json(
+      { error: "AI drafts are turned off in privacy settings. Records stay on this server." },
+      { status: 403 },
+    );
+  }
+  if (parsed.data.provider === "deepseek" && !privacy.aiAllowDeepseek) {
+    return NextResponse.json(
+      { error: "DeepSeek is turned off because its terms may allow training on prompts. Use Gemini, or enable DeepSeek in Privacy." },
+      { status: 403 },
+    );
+  }
+
   const providers = availableProviders();
   if (!providers[parsed.data.provider]) {
     return NextResponse.json(
@@ -65,6 +81,10 @@ export async function POST(request: Request) {
   }
 
   const locale: Locale = parsed.data.locale ?? DEFAULT_LOCALE;
+  const publicName = displayChildName(child.name, privacy.aiShareChildName, locale);
+
+  const mapText = (value: string | null) =>
+    value && !privacy.aiShareChildName ? redactName(value, child.name, locale) : value;
 
   try {
     const result = await generatePortfolioAnalysis({
@@ -72,24 +92,25 @@ export async function POST(request: Request) {
       kind: normalizeAiKind(parsed.data.kind),
       locale,
       child: {
-        name: child.name,
+        name: publicName,
         birthDate: child.birthDate.toISOString().slice(0, 10),
         school: child.school,
-        notes: child.notes,
+        notes: mapText(child.notes),
         events: child.events.map((e) => ({
-          title: e.title,
+          title: mapText(e.title) ?? e.title,
           eventType: e.eventType,
           eventDate: e.eventDate.toISOString().slice(0, 10),
-          description: e.description,
+          description: mapText(e.description),
           category: e.category,
-          location: e.location,
+          location: mapText(e.location),
           achievementRank: e.achievementRank,
           organiser: e.organiser,
           officialName: e.officialName,
           role: e.role,
-          childReflection: e.childReflection,
+          childReflection: mapText(e.childReflection),
           nameOnEvidence: e.nameOnEvidence,
           photoPurpose: e.photoPurpose,
+          lifeStage: stageAtDate(child.birthDate, e.eventDate),
           status: e.status,
           tags: e.eventTags.map((et) => et.tag.name),
         })),

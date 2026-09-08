@@ -75,4 +75,20 @@ describe("buildAiMessages", () => {
     assert.match(user, /10 items/);
     assert.match(system, /name-on-proof/);
   });
+
+  it("asks for a lifelong CV grouped by stage", () => {
+    const { user, system } = buildAiMessages(
+      {
+        name: "Ada",
+        birthDate: "2004-01-01",
+        school: null,
+        notes: null,
+        events: [],
+      },
+      "cv",
+      "en",
+    );
+    assert.match(user, /growing CV/);
+    assert.match(system, /kindergarten today can become a CV/i);
+  });
 });

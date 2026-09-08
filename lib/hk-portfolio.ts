@@ -38,10 +38,21 @@ export const PARTICIPATION_ROLES = [
 ] as const;
 export type ParticipationRole = (typeof PARTICIPATION_ROLES)[number];
 
-export const AI_KINDS = [
+export const LIFE_STAGES = [
+  "kinder",
   "p1",
   "s1",
   "jupas",
+  "cv",
+] as const;
+export type LifeStage = (typeof LIFE_STAGES)[number];
+
+export const AI_KINDS = [
+  "kinder",
+  "p1",
+  "s1",
+  "jupas",
+  "cv",
   "testimonial",
   "memory",
 ] as const;
@@ -121,20 +132,56 @@ export function evidenceGaps(input: EvidenceInput): EvidenceGap[] {
   return gaps;
 }
 
+export function ageInYears(birthDate: Date | string, on: Date = new Date()): number {
+  const born = typeof birthDate === "string" ? new Date(birthDate) : birthDate;
+  if (Number.isNaN(born.getTime()) || Number.isNaN(on.getTime())) return 0;
+  let age = on.getFullYear() - born.getFullYear();
+  const monthDiff = on.getMonth() - born.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && on.getDate() < born.getDate())) {
+    age -= 1;
+  }
+  return Math.max(0, age);
+}
+
+/** Stage of life at a given age. One record can later appear in every later CV. */
+export function lifeStageFromAge(age: number): LifeStage {
+  if (age < 6) return "kinder";
+  if (age < 8) return "p1";
+  if (age < 13) return "s1";
+  if (age < 19) return "jupas";
+  return "cv";
+}
+
+export function stageAtDate(
+  birthDate: Date | string,
+  on: Date | string = new Date(),
+): LifeStage {
+  const when = typeof on === "string" ? new Date(on) : on;
+  return lifeStageFromAge(ageInYears(birthDate, when));
+}
+
 export function suggestedTrack(
   birthDate: Date | string,
   now: Date = new Date(),
-): Extract<AiKind, "p1" | "s1" | "jupas"> {
-  const born = typeof birthDate === "string" ? new Date(birthDate) : birthDate;
-  if (Number.isNaN(born.getTime())) return "p1";
-  let age = now.getFullYear() - born.getFullYear();
-  const monthDiff = now.getMonth() - born.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < born.getDate())) {
-    age -= 1;
+): LifeStage {
+  return stageAtDate(birthDate, now);
+}
+
+export function stageCounts(
+  birthDate: Date | string,
+  events: Array<{ eventDate: Date | string }>,
+): Record<LifeStage, number> {
+  const counts: Record<LifeStage, number> = {
+    kinder: 0,
+    p1: 0,
+    s1: 0,
+    jupas: 0,
+    cv: 0,
+  };
+  for (const event of events) {
+    counts[stageAtDate(birthDate, event.eventDate)] += 1;
   }
-  if (age < 7) return "p1";
-  if (age < 13) return "s1";
-  return "jupas";
+  return counts;
 }
 
 export function normalizeAiKind(kind: string): AiKind {

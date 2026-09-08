@@ -55,12 +55,14 @@ export function EventForm({
   defaults,
   t,
   cancelHref,
+  captionEnabled = true,
 }: {
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
   childOptions: ChildOption[];
   defaults?: EventFormDefaults;
   t: Dictionary;
   cancelHref: string;
+  captionEnabled?: boolean;
 }) {
   const [state, formAction] = useFormState(action, { error: null });
   const [eventType, setEventType] = useState<EventType>(
@@ -89,6 +91,7 @@ export function EventForm({
   const [captionStatus, setCaptionStatus] = useState<
     "idle" | "loading" | "done" | "error"
   >("idle");
+  const [sendToAi, setSendToAi] = useState(captionEnabled);
   const userEditedTitle = useRef(Boolean(defaults?.title));
 
   const showRank =
@@ -139,6 +142,10 @@ export function EventForm({
     }
 
     if (!image) {
+      setCaptionStatus("idle");
+      return;
+    }
+    if (!captionEnabled || !sendToAi) {
       setCaptionStatus("idle");
       return;
     }
@@ -459,6 +466,29 @@ export function EventForm({
 
       <div>
         <label className="label">{t.events.media}</label>
+        {captionEnabled ? (
+          <label className="mb-2 flex items-start gap-2 text-sm text-ink-800">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={sendToAi}
+              onChange={(e) => setSendToAi(e.target.checked)}
+            />
+            <span>
+              {t.events.sendPhotoToAi}
+              <a href="/settings" className="ml-2 text-xs text-brand-700 hover:underline">
+                {t.events.privacyLink}
+              </a>
+            </span>
+          </label>
+        ) : (
+          <p className="mb-2 text-sm text-ink-700/70">
+            {t.events.sendPhotoToAiOff}{" "}
+            <a href="/settings" className="text-brand-700 hover:underline">
+              {t.events.privacyLink}
+            </a>
+          </p>
+        )}
         <FileUploader
           onFiles={onFiles}
           labels={{

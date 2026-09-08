@@ -3,6 +3,7 @@ import { getI18n } from "@/lib/i18n.server";
 import { prisma } from "@/lib/prisma";
 import { EventForm } from "@/components/EventForm";
 import { updateEventAction } from "@/app/actions/events";
+import { getPrivacySettings } from "@/lib/privacy.server";
 
 export const dynamic = "force-dynamic";
 
@@ -14,12 +15,13 @@ export default async function EditEventPage({
   const { id } = await params;
   const { t } = await getI18n();
 
-  const [event, children] = await Promise.all([
+  const [event, children, privacy] = await Promise.all([
     prisma.event.findUnique({
       where: { id },
       include: { eventTags: { include: { tag: true } }, media: { select: { id: true } } },
     }),
     prisma.child.findMany({ orderBy: { name: "asc" } }),
+    getPrivacySettings(),
   ]);
 
   if (!event) notFound();
@@ -35,6 +37,7 @@ export default async function EditEventPage({
           childOptions={children.map((c) => ({ value: c.id, label: c.name }))}
           t={t}
           cancelHref={`/events/${event.id}`}
+          captionEnabled={privacy.aiCaptionEnabled}
           defaults={{
             childId: event.childId,
             eventType: event.eventType,
