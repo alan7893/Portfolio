@@ -24,6 +24,7 @@ export type EventSummary = {
   childReflection: string | null;
   nameOnEvidence: boolean;
   photoPurpose: string | null;
+  lifeStage?: string | null;
   status: string;
   tags: string[];
 };
@@ -37,6 +38,11 @@ export type ChildSummary = {
 };
 
 const KIND_INSTRUCTIONS: Record<AiKind, { "zh-HK": string; en: string }> = {
+  kinder: {
+    "zh-HK":
+      "請按幼稚園成長檔案寫一份溫暖稿。重點係遊戲中學習、性格、自理、同儕同家庭日常，而唔係考試分數。結構：1) 而家嘅小朋友（年齡、性格、興趣）；2) 學習／遊戲歷程，每項日期、背景、感受；3) 持續興趣（音樂、運動、美勞）；4) 家長觀察。同一段紀錄以後可以再用嚟寫小一、中一、大學同履歷，所以唔好當呢份係最後一版。唔好發明獎項。",
+    en: "Write a kindergarten growth file. Focus on learning through play, personality, self-care, peers and family life — not test scores. Structure: 1) the child now (age, personality, interests); 2) play/learning journey with date, background, feeling; 3) sustained interests (music, sport, art); 4) parent observation. The same records will later feed P1, S1, university and a CV, so do not treat this as a final sealed file. Do not invent prizes.",
+  },
   p1: {
     "zh-HK":
       "請按香港小一叩門／小一面試作品集慣例，用已有紀錄寫一份精簡稿，約等於 4 頁 A4 的內容量。結構必須係：1) 封面簡介（姓名、年齡／生日、學校、性格、興趣，約 200–300 字）；2) 學習歷程（K1–而家），每項只寫日期、背景、小朋友感受／學到乜，唔好堆證書；3) 課外活動同成就（最多 3–5 件有故事嘅項目，體育／音樂／義工／表演都可以）；4) 家長觀察同教育理念草稿（真摯、謙遜，唔好空洞讚美）。相片重點：生活照、閱讀、手工、家庭，而唔係獎狀牆。唔好發明獎項或日期。最後用 3 句提示家長要按每間學校辦學理念改一版，唔好一份稿打天下。",
@@ -51,6 +57,11 @@ const KIND_INSTRUCTIONS: Record<AiKind, { "zh-HK": string; en: string }> = {
     "zh-HK":
       "請按 JUPAS OEA（比賽／活動的經驗及成就）格式整理。最多 10 項。每一項用固定欄位：正式活動／獎項名稱、範疇、年份、參與形式、性質、角色、有獎定無獎、獎項類型、不多於 40 字描述。若證明未見申請人全名、正式名稱、年份或獎項類型，該項標「證明不足」，唔好當已齊。之後草擬 Optional Additional Information（中文或英文 500 字內），只寫一件對成長最有意義嘅經歷，具體、反思、唔好空泛。提及：抽查證明接受證書／學校信／有姓名嘅獎牌相；唔接受冇姓名嘅獎牌或證書；檔案 PDF/JPG/PNG 且 ≤1MB。",
     en: "Format the records as JUPAS OEA (Other Experiences and Achievements). Cap at 10 items. For each item use: official activity/award name, domain, year, participation mode, nature, role, award vs non-award, award type, and a description of at most 40 words. If proof is missing the applicant’s full name, official name, year, or award type, mark the item “evidence incomplete” and do not treat it as ready. Then draft the optional Additional Information (≤500 words) on one experience that shaped growth — concrete and reflective. Note that sampled proof may be a certificate, school letter, or a medal photo showing the applicant’s name; unnamed medals/certificates are not accepted; files must be PDF/JPG/PNG ≤1MB.",
+  },
+  cv: {
+    "zh-HK":
+      "請把由幼稚園到而家嘅紀錄編成一份可以長大再用嘅履歷／CV。按人生階段分節（幼稚園、小學、中學、大學／而家），每節只寫有紀錄嘅事實：學業、持續課外活動、獎項、服務、角色。履歷主體用由近到遠；幼稚園只作為早期基礎，唔好佔太多篇幅。標出跨年持續嘅興趣。唔好發明職位或獎項。結尾用 5 條「下一步可以繼續紀錄」嘅建議。",
+    en: "Turn the records from kindergarten to now into a growing CV. Group by life stage (kindergarten, primary, secondary, university/now). In each stage, only facts on file: study, sustained ECA, awards, service, roles. Main CV reverse-chronological; keep kindergarten as a short foundation, not the bulk. Flag interests that lasted across years. Do not invent jobs or prizes. End with 5 suggestions for what to keep recording next.",
   },
   testimonial: {
     "zh-HK":
@@ -67,7 +78,7 @@ const KIND_INSTRUCTIONS: Record<AiKind, { "zh-HK": string; en: string }> = {
 function eventLine(e: EventSummary): string {
   const pillars = wuYuForCategory(e.category);
   const bits = [
-    `${e.eventDate} [${e.eventType}/${e.status}] ${e.title}`,
+    `${e.eventDate} [${e.lifeStage ?? "stage?"}/${e.eventType}/${e.status}] ${e.title}`,
     e.officialName ? `official: ${e.officialName}` : null,
     e.organiser ? `organiser: ${e.organiser}` : null,
     e.role ? `role: ${e.role}` : null,
@@ -100,6 +111,7 @@ export function buildAiMessages(
     "Do not invent prizes, ranks, schools, organisers, roles, or dates.",
     "Do not mention that you are an AI unless asked.",
     "If a prize photo has name-on-proof: no, warn that JUPAS-style evidence needs the child’s full name on the medal or certificate.",
+    "This is a lifelong family record: kindergarten today can become a CV later. Do not discard early years.",
   ].join(" ");
 
   const lines: string[] = [

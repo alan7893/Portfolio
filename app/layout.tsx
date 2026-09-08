@@ -15,6 +15,7 @@ const notoHK = Noto_Sans_HK({
 export const metadata: Metadata = {
   title: "兒童成長紀錄 · Kids Portfolio",
   description: "家庭專用嘅小朋友成長紀錄同作品集。",
+  robots: { index: false, follow: false, nocache: true },
 };
 
 export default async function RootLayout({

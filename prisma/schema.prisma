@@ -26,12 +26,16 @@ enum Role {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String
-  name         String?
-  role         Role     @default(ADMIN)
-  createdAt    DateTime @default(now())
+  id                String   @id @default(uuid())
+  email             String   @unique
+  passwordHash      String
+  name              String?
+  role              Role     @default(ADMIN)
+  createdAt         DateTime @default(now())
+  aiCaptionEnabled  Boolean  @default(true) @map("ai_caption_enabled")
+  aiGenerateEnabled Boolean  @default(true) @map("ai_generate_enabled")
+  aiShareChildName  Boolean  @default(false) @map("ai_share_child_name")
+  aiAllowDeepseek   Boolean  @default(false) @map("ai_allow_deepseek")
 }
 
 model Child {

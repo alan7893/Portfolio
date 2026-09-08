@@ -14,6 +14,26 @@ export default async function GuidePage() {
       </div>
 
       <section className="card space-y-3 p-6">
+        <h2 className="text-lg font-semibold text-ink-900">{t.guide.growTitle}</h2>
+        <p className="text-sm text-ink-700/80">{t.guide.growLead}</p>
+        <ul className="list-disc space-y-1.5 pl-5 text-sm text-ink-800">
+          {t.guide.growItems.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="card space-y-3 p-6">
+        <h2 className="text-lg font-semibold text-ink-900">{t.guide.kinderTitle}</h2>
+        <p className="text-sm text-ink-700/80">{t.guide.kinderLead}</p>
+        <ul className="list-disc space-y-1.5 pl-5 text-sm text-ink-800">
+          {t.guide.kinderItems.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="card space-y-3 p-6">
         <h2 className="text-lg font-semibold text-ink-900">{t.guide.p1Title}</h2>
         <p className="text-sm text-ink-700/80">{t.guide.p1Lead}</p>
         <ul className="list-disc space-y-1.5 pl-5 text-sm text-ink-800">
@@ -44,6 +64,16 @@ export default async function GuidePage() {
           ))}
         </ul>
         <p className="text-sm text-ink-700/70">{t.guide.jupasPhotos}</p>
+      </section>
+
+      <section className="card space-y-3 p-6">
+        <h2 className="text-lg font-semibold text-ink-900">{t.guide.cvTitle}</h2>
+        <p className="text-sm text-ink-700/80">{t.guide.cvLead}</p>
+        <ul className="list-disc space-y-1.5 pl-5 text-sm text-ink-800">
+          {t.guide.cvItems.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
       </section>
 
       <section className="card space-y-3 p-6">

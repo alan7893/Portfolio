@@ -40,7 +40,16 @@ export type ChildInput = z.infer<typeof childInputSchema>;
 export const aiGenerateSchema = z.object({
   childId: z.string().uuid(),
   provider: z.enum(["gemini", "deepseek"]),
-  kind: z.enum(["p1", "s1", "jupas", "portfolio", "testimonial", "memory"]),
+  kind: z.enum([
+    "kinder",
+    "p1",
+    "s1",
+    "jupas",
+    "cv",
+    "portfolio",
+    "testimonial",
+    "memory",
+  ]),
   locale: z.enum(["zh-HK", "en"]).optional(),
 });
 

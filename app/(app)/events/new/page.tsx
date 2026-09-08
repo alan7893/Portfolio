@@ -4,14 +4,16 @@ import { getActiveChildId } from "@/lib/child.server";
 import { EventForm } from "@/components/EventForm";
 import { EmptyState } from "@/components/EmptyState";
 import { createEventAction } from "@/app/actions/events";
+import { getPrivacySettings } from "@/lib/privacy.server";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewEventPage() {
   const { t } = await getI18n();
-  const [children, activeId] = await Promise.all([
+  const [children, activeId, privacy] = await Promise.all([
     prisma.child.findMany({ orderBy: { name: "asc" } }),
     getActiveChildId(),
+    getPrivacySettings(),
   ]);
 
   if (children.length === 0) {
@@ -42,6 +44,7 @@ export default async function NewEventPage() {
           defaults={{ childId: defaultChildId }}
           t={t}
           cancelHref="/events"
+          captionEnabled={privacy.aiCaptionEnabled}
         />
       </div>
     </div>

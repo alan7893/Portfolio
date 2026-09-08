@@ -8,6 +8,8 @@ import { StatCard } from "@/components/StatCard";
 import { EmptyState } from "@/components/EmptyState";
 import { formatDate } from "@/lib/format";
 import { childEventWhere, getActiveChildId } from "@/lib/child.server";
+import { GrowthPath } from "@/components/GrowthPath";
+import { stageCounts, suggestedTrack } from "@/lib/hk-portfolio";
 
 export const dynamic = "force-dynamic";
 
@@ -20,12 +22,22 @@ export default async function DashboardPage() {
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   const childWhere = await childEventWhere();
   const activeId = await getActiveChildId();
-  const [childCount, activeChild] = await Promise.all([
+  const [childCount, pathKids] = await Promise.all([
     prisma.child.count(),
-    activeId
-      ? prisma.child.findUnique({ where: { id: activeId }, select: { name: true } })
-      : Promise.resolve(null),
+    prisma.child.findMany({
+      where: activeId ? { id: activeId } : {},
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        birthDate: true,
+        events: { select: { eventDate: true } },
+      },
+    }),
   ]);
+  const activeChild = activeId
+    ? (pathKids.find((k) => k.id === activeId) ?? null)
+    : null;
 
   if (childCount === 0) {
     return (
@@ -89,6 +101,16 @@ export default async function DashboardPage() {
           {t.dashboard.guideCta} →
         </p>
       </Link>
+
+      {pathKids.map((kid) => (
+        <GrowthPath
+          key={kid.id}
+          t={t}
+          current={suggestedTrack(kid.birthDate)}
+          counts={stageCounts(kid.birthDate, kid.events)}
+          childName={pathKids.length > 1 ? kid.name : undefined}
+        />
+      ))}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label={t.dashboard.totalEvents} value={total} accent="brand" />

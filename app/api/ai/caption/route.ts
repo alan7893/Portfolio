@@ -12,6 +12,7 @@ import { mimeFromName } from "@/lib/constants";
 import { checkRateLimit, registerFailedAttempt } from "@/lib/rateLimit";
 import { DEFAULT_LOCALE, normalizeLocale } from "@/lib/i18n";
 import { prepareVisionJpeg } from "@/lib/photo-vision";
+import { getPrivacySettings } from "@/lib/privacy.server";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -26,6 +27,14 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "Gemini API key is not configured for photo reading." },
       { status: 501 },
+    );
+  }
+
+  const privacy = await getPrivacySettings();
+  if (!privacy.aiCaptionEnabled) {
+    return NextResponse.json(
+      { error: "Photo AI is turned off. The original stays only on this family server." },
+      { status: 403 },
     );
   }
 

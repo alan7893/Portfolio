@@ -6,6 +6,7 @@ import { formatDate } from "@/lib/format";
 import { EmptyState } from "@/components/EmptyState";
 import { DeleteEventButton } from "@/components/DeleteEventButton";
 import { deleteChildAction } from "@/app/actions/children";
+import { suggestedTrack } from "@/lib/hk-portfolio";
 
 export const dynamic = "force-dynamic";
 
@@ -50,9 +51,13 @@ export default async function ChildrenPage() {
                 {c.notes && (
                   <p className="line-clamp-2 text-sm text-ink-700/70">{c.notes}</p>
                 )}
-                <p className="text-xs font-medium text-brand-700">
-                  {interpolate(t.children.eventCount, { count: c._count.events })}
-                </p>
+                  <p className="text-xs font-medium text-brand-700">
+                    {interpolate(t.children.stageNow, {
+                      stage: t.stages[suggestedTrack(c.birthDate)],
+                    })}
+                    {" · "}
+                    {interpolate(t.children.eventCount, { count: c._count.events })}
+                  </p>
                 <div className="mt-auto flex items-center gap-2 pt-2">
                   <Link href={`/children/${c.id}/edit`} className="btn-ghost">
                     {t.common.edit}
