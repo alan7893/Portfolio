@@ -201,39 +201,36 @@ export function BulkImport({
       if (file.size > MAX_FILE_BYTES) continue;
       accepted.push(file);
     }
-    let take: File[] = [];
-    let added: BulkItem[] = [];
+    const skippedOut = items.filter((p) => !p.skipped).length;
+    const room = Math.max(0, BULK_MAX_PHOTOS - skippedOut);
+    setTooMany(accepted.length > room);
+    const take = accepted.slice(0, room);
+    const added: BulkItem[] = take.map((file) => ({
+      localId: crypto.randomUUID(),
+      name: file.name,
+      previewUrl: URL.createObjectURL(file),
+      stagedId: "",
+      suggestedDate: todayLocal(),
+      dateFromPhoto: false,
+      title: "",
+      description: "",
+      eventType: "PHOTO",
+      category: "",
+      tags: "",
+      organiser: "",
+      officialName: "",
+      achievementRank: "",
+      role: "",
+      photoPurpose: "",
+      nameOnEvidence: false,
+      childReflection: "",
+      status: "queued",
+      skipped: false,
+      error: null,
+    }));
     flushSync(() => {
-      setItems((prev) => {
-        const room = Math.max(0, BULK_MAX_PHOTOS - prev.filter((p) => !p.skipped).length);
-        take = accepted.slice(0, room);
-        added = take.map((file) => ({
-          localId: crypto.randomUUID(),
-          name: file.name,
-          previewUrl: URL.createObjectURL(file),
-          stagedId: "",
-          suggestedDate: todayLocal(),
-          dateFromPhoto: false,
-          title: "",
-          description: "",
-          eventType: "PHOTO",
-          category: "",
-          tags: "",
-          organiser: "",
-          officialName: "",
-          achievementRank: "",
-          role: "",
-          photoPurpose: "",
-          nameOnEvidence: false,
-          childReflection: "",
-          status: "queued",
-          skipped: false,
-          error: null,
-        }));
-        return [...prev, ...added];
-      });
+      setItems((prev) => [...prev, ...added]);
     });
-    setTooMany(accepted.length > take.length);
     if (added.length) void runPool(added, take);
   }
 
