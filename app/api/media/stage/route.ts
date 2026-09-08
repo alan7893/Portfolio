@@ -6,7 +6,9 @@ import {
   stageUploadedFile,
   validateFile,
   mediaWriteErrorMessage,
+  readStagedBytes,
 } from "@/lib/uploads";
+import { extractPhotoTakenAt } from "@/lib/photo-vision";
 
 export const runtime = "nodejs";
 
@@ -42,11 +44,17 @@ export async function POST(request: Request) {
 
   try {
     const staged = await stageUploadedFile(file, userId);
+    let suggestedDate: string | null = null;
+    if (staged.fileType.startsWith("image/")) {
+      const packed = await readStagedBytes(userId, staged.id);
+      if (packed) suggestedDate = await extractPhotoTakenAt(packed.bytes);
+    }
     return NextResponse.json({
       id: staged.id,
       originalName: staged.originalName,
       fileType: staged.fileType,
       sizeBytes: staged.sizeBytes,
+      suggestedDate,
     });
   } catch (e) {
     console.error("[media/stage] write failed", e);

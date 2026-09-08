@@ -12,7 +12,7 @@
     "prisma:deploy": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "test": "tsx --test lib/ai-prompt.test.ts lib/ai-caption.test.ts lib/uploads.test.ts lib/photo-vision.test.ts lib/hk-portfolio.test.ts lib/privacy.test.ts",
+    "test": "tsx --test lib/ai-prompt.test.ts lib/ai-caption.test.ts lib/uploads.test.ts lib/photo-vision.test.ts lib/hk-portfolio.test.ts lib/privacy.test.ts lib/bulk.test.ts",
     "postinstall": "prisma generate"
   },
   "prisma": {

@@ -19,6 +19,7 @@ type SearchParams = Promise<{
   year?: string;
   tag?: string;
   page?: string;
+  imported?: string;
 }>;
 
 export default async function EventsPage({
@@ -73,10 +74,21 @@ export default async function EventsPage({
             {interpolate(t.events.resultsCount, { count: total })}
           </p>
         </div>
-        <Link href="/events/new" className="btn-primary">
-          + {t.events.newEvent}
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/events/bulk" className="btn-primary">
+            {t.events.bulkCta}
+          </Link>
+          <Link href="/events/new" className="btn-ghost">
+            + {t.events.newEvent}
+          </Link>
+        </div>
       </div>
+
+      {sp.imported && Number(sp.imported) > 0 && (
+        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          {interpolate(t.events.bulkImported, { count: Number(sp.imported) })}
+        </p>
+      )}
 
       <EventFilters
         labels={{

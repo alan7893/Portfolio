@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { eventInputSchema, parseTags, parseNameOnEvidence, parsePhotoPurpose, parseParticipationRole } from "@/lib/validation";
+import { eventInputSchema, parseTags, parseNameOnEvidence, parsePhotoPurpose, parseParticipationRole, bulkImportSchema } from "@/lib/validation";
 import type { ActionState } from "@/lib/action-state";
 import {
   deleteEventFiles,
@@ -18,6 +18,7 @@ import {
   mediaWriteErrorMessage,
 } from "@/lib/uploads";
 import type { SavedFile } from "@/lib/uploads";
+import { getI18n } from "@/lib/i18n.server";
 
 async function requireSession() {
   const session = await getServerSession(authOptions);
@@ -219,6 +220,96 @@ export async function createEventAction(
   revalidatePath("/events");
   revalidatePath("/timeline");
   redirect(`/events/${event.id}`);
+}
+
+export async function createBulkEventsAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await requireSession();
+  const userId = sessionUserId(session);
+
+  let payload: unknown = {};
+  try {
+    payload = JSON.parse(String(formData.get("payload") ?? "{}"));
+  } catch {
+    return { error: "Could not read the photo list. Please drop them again." };
+  }
+
+  const parsed = bulkImportSchema.safeParse({
+    childId: String(formData.get("childId") ?? ""),
+    items: (payload as { items?: unknown }).items,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  const child = await prisma.child.findUnique({
+    where: { id: parsed.data.childId },
+    select: { id: true },
+  });
+  if (!child) {
+    return { error: "Child not found. Add a child first." };
+  }
+
+  for (const item of parsed.data.items) {
+    const staged = await readStagedFile(userId, item.staged);
+    if (!staged) {
+      return { error: "Photos were not found on the server. Please choose them again." };
+    }
+  }
+
+  const untitled = (await getI18n()).t.events.bulkUntitled;
+  let created = 0;
+  try {
+    for (const item of parsed.data.items) {
+      const title = item.title?.trim() || untitled;
+      const eventDate = new Date(item.eventDate);
+      if (Number.isNaN(eventDate.getTime())) {
+        throw new Error("A photo is missing a valid date.");
+      }
+      const event = await prisma.event.create({
+        data: {
+          childId: parsed.data.childId,
+          eventType: (item.eventType || "PHOTO") as never,
+          title,
+          description: item.description?.trim() || null,
+          eventDate,
+          category: item.category?.trim() || null,
+          location: item.location?.trim() || null,
+          achievementRank: item.achievementRank?.trim() || null,
+          organiser: item.organiser?.trim() || null,
+          officialName: item.officialName?.trim() || null,
+          role: parseParticipationRole(item.role),
+          childReflection: item.childReflection?.trim() || null,
+          nameOnEvidence: Boolean(item.nameOnEvidence),
+          photoPurpose: parsePhotoPurpose(item.photoPurpose),
+          status: "COMPLETED",
+        },
+      });
+      created += 1;
+      await syncTags(event.id, parseTags(item.tags));
+      const stored = await attachStagedFiles([item.staged], userId, parsed.data.childId, event.id);
+      if (stored.length === 0) {
+        await prisma.event.delete({ where: { id: event.id } }).catch(() => {});
+        throw new Error("Photos were not found on the server. Please choose them again.");
+      }
+      await insertMediaRows(event.id, stored);
+    }
+  } catch (e) {
+    console.error("[events] bulk import failed", e);
+    return {
+      error:
+        created > 0
+          ? `${mediaWriteErrorMessage(e)} Saved ${created} photo(s) before that.`
+          : mediaWriteErrorMessage(e),
+    };
+  }
+
+  revalidatePath("/");
+  revalidatePath("/events");
+  revalidatePath("/timeline");
+  redirect(`/events?imported=${created}`);
 }
 
 export async function updateEventAction(
