@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { flushSync } from "react-dom";
+import Link from "next/link";
 import type { EventType } from "@prisma/client";
 import type { Dictionary } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n";
@@ -315,17 +316,17 @@ export function BulkImport({
               />
               <span>
                 {t.events.bulkUseAi}{" "}
-                <a href="/settings" className="text-xs text-brand-700 hover:underline">
+                <Link href="/settings" className="text-xs text-brand-700 hover:underline">
                   {t.events.privacyLink}
-                </a>
+                </Link>
               </span>
             </label>
           ) : (
             <p className="text-sm text-ink-700/70">
               {t.events.sendPhotoToAiOff}{" "}
-              <a href="/settings" className="text-brand-700 hover:underline">
+              <Link href="/settings" className="text-brand-700 hover:underline">
                 {t.events.privacyLink}
-              </a>
+              </Link>
             </p>
           )}
         </div>
@@ -470,9 +471,9 @@ export function BulkImport({
             pendingLabel={t.common.loading}
             disabled={busy || savable.length === 0}
           />
-          <a href="/events" className="btn-ghost">
+          <Link href="/events" className="btn-ghost">
             {t.common.cancel}
-          </a>
+          </Link>
         </div>
       </form>
     </div>
