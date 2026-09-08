@@ -1,6 +1,7 @@
 import { CATEGORIES, EVENT_TYPES } from "@/lib/constants";
 import type { EventType } from "@prisma/client";
 import type { Locale } from "@/lib/i18n";
+import { titleLooksLikeFilename } from "@/lib/photo-vision";
 
 export type PhotoCaption = {
   title: string;
@@ -20,16 +21,19 @@ export function buildCaptionPrompt(locale: Locale): { system: string; user: stri
       : "Hong Kong Cantonese (written 廣東話, not Mandarin)";
   const system = [
     "You caption family photos of children for a private parent portfolio.",
+    "You receive only pixels. There is no filename, EXIF, GPS, or camera title.",
+    "Describe what is actually visible in the image. Never copy a file name such as IMG_1234, DSCF, PXL, Screenshot, or anything ending in .jpg/.heic.",
+    "Do not invent names, ages, schools, addresses, dates, or locations that are not clearly written in the picture.",
     `Write title and description in ${lang}.`,
     "Return ONLY compact JSON with keys: title, category, eventType, description, tags.",
     `category must be one of: ${CATEGORIES.join(", ")} (or empty string).`,
     `eventType must be one of: ${EVENT_TYPES.join(", ")}. Use PHOTO unless the image clearly shows a prize, competition or milestone.`,
     "title: max 40 characters, specific, no emoji dump.",
-    "description: one or two short sentences of what is visible. Do not invent names, schools, ranks or dates.",
+    "description: one or two short sentences of what is visible.",
     "tags: 0-4 short labels.",
   ].join(" ");
   const user =
-    "Look at this photo and fill the JSON for a child's portfolio event.";
+    "Look at the image pixels and fill the JSON. If you cannot see the image, return {\"title\":\"\",\"category\":\"\",\"eventType\":\"PHOTO\",\"description\":\"\",\"tags\":[]}.";
   return { system, user };
 }
 
@@ -51,13 +55,14 @@ export function parseCaptionJson(raw: string): PhotoCaption {
     ? tagsRaw.map((t) => String(t).trim()).filter(Boolean).slice(0, 4)
     : [];
 
-  const title = String(parsed.title ?? "")
+  const titleRaw = String(parsed.title ?? "")
     .trim()
     .replace(/\s+/g, " ")
     .slice(0, 80);
+  const title = titleLooksLikeFilename(titleRaw) ? "" : titleRaw;
 
   return {
-    title: title || "相片",
+    title,
     category: CATEGORY_SET.has(categoryRaw)
       ? (categoryRaw as PhotoCaption["category"])
       : "",

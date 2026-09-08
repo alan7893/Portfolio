@@ -192,6 +192,21 @@ export async function readStagedFile(
   }
 }
 
+export async function readStagedBytes(
+  userId: string,
+  id: string,
+): Promise<{ meta: StagedFileMeta; bytes: Buffer } | null> {
+  const meta = await readStagedFile(userId, id);
+  if (!meta) return null;
+  try {
+    const bytes = await fs.readFile(path.join(stagingDir(userId), `${id}${meta.ext}`));
+    if (!bytes.length) return null;
+    return { meta, bytes };
+  } catch {
+    return null;
+  }
+}
+
 export async function attachStagedFiles(
   ids: string[],
   userId: string,

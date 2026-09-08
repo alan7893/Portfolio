@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { parseCaptionJson } from "./ai-caption";
+import { titleLooksLikeFilename } from "./photo-vision";
 
 describe("parseCaptionJson", () => {
   it("reads fenced JSON and maps category", () => {
@@ -14,7 +15,7 @@ describe("parseCaptionJson", () => {
 
   it("falls back when JSON is junk", () => {
     const cap = parseCaptionJson("not json at all");
-    assert.equal(cap.title, "相片");
+    assert.equal(cap.title, "");
     assert.equal(cap.category, "");
     assert.equal(cap.eventType, "PHOTO");
   });
@@ -26,5 +27,20 @@ describe("parseCaptionJson", () => {
     assert.equal(cap.category, "");
     assert.equal(cap.eventType, "PHOTO");
     assert.equal(cap.title, "獎盃");
+  });
+
+  it("drops titles that are just a camera file name", () => {
+    const cap = parseCaptionJson(
+      '{"title":"IMG_4022.HEIC","category":"family","eventType":"PHOTO"}',
+    );
+    assert.equal(cap.title, "");
+  });
+});
+
+describe("titleLooksLikeFilename", () => {
+  it("detects camera names and extensions", () => {
+    assert.equal(titleLooksLikeFilename("IMG_1234"), true);
+    assert.equal(titleLooksLikeFilename("park.jpg"), true);
+    assert.equal(titleLooksLikeFilename("公園踏單車"), false);
   });
 });

@@ -105,6 +105,7 @@ async function geminiNative(
   system: string,
   user: string,
   image?: { mimeType: string; dataBase64: string },
+  jsonMode = false,
 ): Promise<string> {
   const url = `${GEMINI_NATIVE_BASE}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const userParts: Array<Record<string, unknown>> = [{ text: user }];
@@ -119,7 +120,10 @@ async function geminiNative(
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: system }] },
       contents: [{ role: "user", parts: userParts }],
-      generationConfig: { temperature: 0.3 },
+      generationConfig: {
+        temperature: 0.3,
+        ...(jsonMode ? { responseMimeType: "application/json" } : {}),
+      },
     }),
     signal: AbortSignal.timeout(60_000),
   });
@@ -156,9 +160,16 @@ async function completeGemini(
   let last: unknown;
   for (const model of geminiModels()) {
     try {
-      return await geminiNative(key, model, system, user, image);
+      return await geminiNative(key, model, system, user, image, Boolean(image));
     } catch (err) {
       last = err;
+      if (image) {
+        try {
+          return await geminiNative(key, model, system, user, image, false);
+        } catch (err2) {
+          last = err2;
+        }
+      }
     }
     if (!image) {
       try {
@@ -205,5 +216,9 @@ export async function captionPhoto(opts: {
     mimeType: opts.mimeType,
     dataBase64: opts.dataBase64,
   });
-  return { ...parseCaptionJson(raw), provider: "gemini" };
+  const caption = parseCaptionJson(raw);
+  if (!caption.title) {
+    throw new AiError("The model did not describe what is in the photo.", 502);
+  }
+  return { ...caption, provider: "gemini" };
 }
