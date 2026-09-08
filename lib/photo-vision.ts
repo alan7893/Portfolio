@@ -1,8 +1,8 @@
 import sharp from "sharp";
 
-/** Longest edge sent to the vision model. Original stays on our server. */
-export const VISION_MAX_EDGE = 1024;
-const VISION_JPEG_QUALITY = 78;
+/** Longest edge sent to the vision model. Keep medals in-hand readable. */
+export const VISION_MAX_EDGE = 1600;
+const VISION_JPEG_QUALITY = 88;
 
 export type VisionJpeg = {
   mimeType: "image/jpeg";

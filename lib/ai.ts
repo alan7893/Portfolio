@@ -1,5 +1,5 @@
 import { buildAiMessages, type AiKind, type AiProvider, type ChildSummary } from "@/lib/ai-prompt";
-import { buildCaptionPrompt, parseCaptionJson, refineCaption, type PhotoCaption } from "@/lib/ai-caption";
+import { buildCaptionPrompt, parseCaptionJson, refineCaption, buildAwardDetectPrompt, parseAwardDetect, hasAwardObject, emptyAwardFacts, type PhotoCaption } from "@/lib/ai-caption";
 import type { Locale } from "@/lib/i18n";
 
 function runtimeEnv(name: string): string {
@@ -211,12 +211,32 @@ export async function captionPhoto(opts: {
   mimeType: string;
   dataBase64: string;
 }): Promise<PhotoCaption & { provider: "gemini" }> {
-  const { system, user } = buildCaptionPrompt(opts.locale);
-  const raw = await completeGemini(system, user, {
+  const image = {
     mimeType: opts.mimeType,
     dataBase64: opts.dataBase64,
-  });
-  const caption = refineCaption(parseCaptionJson(raw), opts.locale);
+  };
+  let facts = emptyAwardFacts();
+  try {
+    const detectPrompt = buildAwardDetectPrompt();
+    const detectRaw = await completeGemini(detectPrompt.system, detectPrompt.user, image);
+    facts = parseAwardDetect(detectRaw);
+  } catch {
+    facts = emptyAwardFacts();
+  }
+
+  const { system, user } = buildCaptionPrompt(opts.locale, facts);
+  const raw = await completeGemini(system, user, image);
+  const parsed = parseCaptionJson(raw);
+  if (hasAwardObject(parsed.facts)) {
+    facts = {
+      holdingMedal: facts.holdingMedal || parsed.facts.holdingMedal,
+      wearingMedal: facts.wearingMedal || parsed.facts.wearingMedal,
+      holdingTrophy: facts.holdingTrophy || parsed.facts.holdingTrophy,
+      isLesson: facts.isLesson && !hasAwardObject(parsed.facts),
+      sportHint: facts.sportHint || parsed.facts.sportHint,
+    };
+  }
+  const caption = refineCaption(parsed, opts.locale, facts);
   if (!caption.title) {
     throw new AiError("The model did not describe what is in the photo.", 502);
   }

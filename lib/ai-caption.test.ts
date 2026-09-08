@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { parseCaptionJson, refineCaption } from "./ai-caption";
+import { parseCaptionJson, refineCaption, parseAwardDetect, hasAwardObject } from "./ai-caption";
 import { titleLooksLikeFilename } from "./photo-vision";
 
 describe("parseCaptionJson", () => {
@@ -75,6 +75,40 @@ describe("refineCaption", () => {
     );
     assert.equal(cap.eventType, "PHOTO");
     assert.equal(cap.title, "公園踏單車");
+  });
+
+  it("forces a prize when the detector saw a medal in hand, even if the title missed it", () => {
+    const cap = refineCaption(
+      {
+        title: "喺泳池",
+        category: "",
+        eventType: "PHOTO",
+        description: "小朋友喺泳池邊微笑。",
+        tags: ["游泳"],
+      },
+      "zh-HK",
+      {
+        holdingMedal: true,
+        wearingMedal: false,
+        holdingTrophy: false,
+        isLesson: false,
+        sportHint: "swimming",
+      },
+    );
+    assert.equal(cap.eventType, "PRIZE");
+    assert.equal(cap.title, "游泳比賽得獎");
+    assert.equal(cap.category, "sports");
+  });
+});
+
+describe("parseAwardDetect", () => {
+  it("reads medal flags", () => {
+    const facts = parseAwardDetect(
+      '{"holdingMedal":true,"wearingMedal":false,"holdingTrophy":false,"isLesson":false,"sportHint":"swimming"}',
+    );
+    assert.equal(facts.holdingMedal, true);
+    assert.equal(hasAwardObject(facts), true);
+    assert.equal(facts.sportHint, "swimming");
   });
 });
 
