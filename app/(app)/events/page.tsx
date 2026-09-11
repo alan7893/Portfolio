@@ -41,8 +41,8 @@ export default async function EventsPage({
   if (sp.year) {
     const y = Number(sp.year);
     where.eventDate = {
-      gte: new Date(y, 0, 1),
-      lt: new Date(y + 1, 0, 1),
+      gte: new Date(Date.UTC(y, 0, 1)),
+      lt: new Date(Date.UTC(y + 1, 0, 1)),
     };
   }
   if (sp.tag) {

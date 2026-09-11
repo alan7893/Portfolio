@@ -43,6 +43,10 @@ export async function prepareVisionJpeg(input: Buffer): Promise<VisionJpeg> {
 }
 
 const EXIF_DATE_RE = /(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/g;
+const EXIF_ORIGINAL_RE =
+  /DateTimeOriginal[^0-9]{0,24}(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/;
+const FILE_DATE_RE =
+  /(?:^|[^\d])((?:19|20)\d{2})[-_.]?([01]\d)[-_.]?([0-3]\d)(?:[^\d]|$)/g;
 
 function ymdIfValid(year: number, month: number, day: number): string | null {
   if (month < 1 || month > 12 || day < 1 || day > 31) return null;
@@ -55,13 +59,30 @@ function ymdIfValid(year: number, month: number, day: number): string | null {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-/** Read a camera date from EXIF bytes. Does not use GPS. */
+/** Read a camera date from EXIF bytes. Prefers DateTimeOriginal. Does not use GPS. */
 export function parseExifTakenDate(input: Buffer): string | null {
   const slice = input.subarray(0, Math.min(input.length, 512 * 1024));
   const text = slice.toString("latin1");
+  const original = EXIF_ORIGINAL_RE.exec(text);
+  if (original) {
+    const ymd = ymdIfValid(Number(original[1]), Number(original[2]), Number(original[3]));
+    if (ymd) return ymd;
+  }
   EXIF_DATE_RE.lastIndex = 0;
   let match: RegExpExecArray | null;
   while ((match = EXIF_DATE_RE.exec(text))) {
+    const ymd = ymdIfValid(Number(match[1]), Number(match[2]), Number(match[3]));
+    if (ymd) return ymd;
+  }
+  return null;
+}
+
+/** Dates encoded in camera file names, e.g. IMG_20200615.jpg or PXL_2020-06-15. */
+export function parseFilenameTakenDate(name: string): string | null {
+  const base = name.split(/[/\\]/).pop() ?? name;
+  FILE_DATE_RE.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = FILE_DATE_RE.exec(base))) {
     const ymd = ymdIfValid(Number(match[1]), Number(match[2]), Number(match[3]));
     if (ymd) return ymd;
   }
@@ -84,6 +105,13 @@ export async function extractPhotoTakenAt(input: Buffer): Promise<string | null>
     // Still scan the raw bytes below.
   }
   return parseExifTakenDate(input);
+}
+
+export async function resolvePhotoTakenAt(
+  input: Buffer,
+  filename?: string,
+): Promise<string | null> {
+  return (await extractPhotoTakenAt(input)) || parseFilenameTakenDate(filename ?? "");
 }
 
 export function titleLooksLikeFilename(title: string): boolean {

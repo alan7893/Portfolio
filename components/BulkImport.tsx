@@ -5,11 +5,19 @@ import { useFormState, useFormStatus } from "react-dom";
 import { flushSync } from "react-dom";
 import Link from "next/link";
 import type { EventType } from "@prisma/client";
-import type { Dictionary } from "@/lib/i18n";
+import type { Dictionary, Locale } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n";
 import type { ActionState } from "@/lib/action-state";
 import { ACCEPTED_MIME, BULK_MAX_PHOTOS, MAX_FILE_BYTES, mimeFromName } from "@/lib/constants";
 import { EVENT_TYPES, CATEGORIES } from "@/lib/constants";
+import { todayDateOnly } from "@/lib/dates";
+import { formatDate } from "@/lib/format";
+import {
+  dateFromCameraOrToday,
+  isSavableItem,
+  isUploadBusy,
+  keepCameraDate,
+} from "@/lib/bulk-flow";
 
 type ChildOption = { value: string; label: string };
 
@@ -30,7 +38,7 @@ type CaptionJson = {
   error?: string;
 };
 
-type ItemStatus = "queued" | "uploading" | "captioning" | "ready" | "error";
+type ItemStatus = "queued" | "uploading" | "uploaded" | "captioning" | "ready" | "error";
 
 type BulkItem = {
   localId: string;
@@ -55,12 +63,6 @@ type BulkItem = {
   skipped: boolean;
   error: string | null;
 };
-
-function todayLocal(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
 
 function isImageName(name: string, type: string): boolean {
   const mime = type || mimeFromName(name);
@@ -105,6 +107,8 @@ export function BulkImport({
   const inputRef = useRef<HTMLInputElement>(null);
   const sendToAiRef = useRef(sendToAi);
   sendToAiRef.current = sendToAi;
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
   const untitled = t.events.bulkUntitled;
 
   useEffect(() => {
@@ -122,7 +126,7 @@ export function BulkImport({
     setItems((prev) => prev.map((it) => (it.localId === localId ? { ...it, ...next } : it)));
   }
 
-  async function processOne(localId: string, file: File) {
+  async function uploadOne(localId: string, file: File): Promise<string | null> {
     patch(localId, { status: "uploading", error: null });
     const body = new FormData();
     body.append("file", file);
@@ -137,39 +141,50 @@ export function BulkImport({
         status: "error",
         error: staged.error || t.upload.uploadFailed,
       });
-      return;
+      return null;
     }
-    const dateFromPhoto = Boolean(staged.suggestedDate);
-    const suggestedDate = staged.suggestedDate || todayLocal();
+    const dated = dateFromCameraOrToday(staged.suggestedDate, todayDateOnly());
     patch(localId, {
       stagedId: staged.id,
-      suggestedDate,
-      dateFromPhoto,
+      suggestedDate: dated.suggestedDate,
+      dateFromPhoto: dated.dateFromPhoto,
+      status: "uploaded",
+      title: untitled,
+      error: null,
     });
+    return staged.id;
+  }
 
+  async function captionOne(localId: string, file: File, stagedId: string) {
+    const snapshot = itemsRef.current.find((it) => it.localId === localId);
+    if (!snapshot || snapshot.skipped || snapshot.status === "error") {
+      return;
+    }
     const useAi = captionEnabled && sendToAiRef.current && isImageName(file.name, file.type);
     if (!useAi) {
-      patch(localId, {
-        status: "ready",
-        title: untitled,
-        suggestedDate,
-        dateFromPhoto,
-      });
+      patch(localId, { status: "ready" });
       return;
     }
 
     patch(localId, { status: "captioning" });
     const capBody = new FormData();
-    capBody.append("staged", staged.id);
+    capBody.append("staged", stagedId);
     capBody.append("locale", t.locale);
     const capRes = await fetch("/api/ai/caption", { method: "POST", body: capBody });
     const json = (await capRes.json().catch(() => ({}))) as CaptionJson;
+    const latest = itemsRef.current.find((it) => it.localId === localId);
+    const dated = keepCameraDate(
+      {
+        suggestedDate: latest?.suggestedDate ?? snapshot.suggestedDate,
+        dateFromPhoto: latest?.dateFromPhoto ?? snapshot.dateFromPhoto,
+      },
+      json.suggestedDate,
+    );
     if (!capRes.ok) {
       patch(localId, {
         status: "error",
-        title: untitled,
-        suggestedDate: json.suggestedDate || suggestedDate,
-        dateFromPhoto: Boolean(json.suggestedDate) || dateFromPhoto,
+        title: latest?.title || untitled,
+        ...dated,
         error: json.error || t.events.bulkFailed,
       });
       return;
@@ -188,8 +203,7 @@ export function BulkImport({
       photoPurpose: json.photoPurpose ?? "",
       nameOnEvidence: Boolean(json.nameOnEvidence),
       childReflection: json.childReflection ?? "",
-      suggestedDate: json.suggestedDate || suggestedDate,
-      dateFromPhoto: Boolean(json.suggestedDate) || dateFromPhoto,
+      ...dated,
       error: null,
     });
   }
@@ -211,7 +225,7 @@ export function BulkImport({
       name: file.name,
       previewUrl: URL.createObjectURL(file),
       stagedId: "",
-      suggestedDate: todayLocal(),
+      suggestedDate: todayDateOnly(),
       dateFromPhoto: false,
       title: "",
       description: "",
@@ -232,26 +246,42 @@ export function BulkImport({
     flushSync(() => {
       setItems((prev) => [...prev, ...added]);
     });
-    if (added.length) void runPool(added, take);
+    if (added.length) void runBatch(added, take);
   }
 
-  async function runPool(added: BulkItem[], files: File[]) {
+  async function runPool<T>(jobs: T[], workers: number, fn: (job: T) => Promise<void>) {
     let cursor = 0;
-    const workers = 2;
     async function worker() {
-      while (cursor < added.length) {
+      while (cursor < jobs.length) {
         const index = cursor;
         cursor += 1;
-        const item = added[index];
-        const file = files[index];
-        try {
-          await processOne(item.localId, file);
-        } catch {
-          patch(item.localId, { status: "error", error: t.upload.uploadFailed, title: untitled });
-        }
+        await fn(jobs[index]);
       }
     }
-    await Promise.all(Array.from({ length: Math.min(workers, added.length) }, () => worker()));
+    await Promise.all(Array.from({ length: Math.min(workers, jobs.length) }, () => worker()));
+  }
+
+  async function runBatch(added: BulkItem[], files: File[]) {
+    const jobs = added.map((item, index) => ({ item, file: files[index], stagedId: "" }));
+    await runPool(jobs, 3, async (job) => {
+      try {
+        job.stagedId = (await uploadOne(job.item.localId, job.file)) ?? "";
+      } catch {
+        patch(job.item.localId, {
+          status: "error",
+          error: t.upload.uploadFailed,
+          title: untitled,
+        });
+      }
+    });
+    await runPool(jobs, 2, async (job) => {
+      if (!job.stagedId) return;
+      try {
+        await captionOne(job.item.localId, job.file, job.stagedId);
+      } catch {
+        patch(job.item.localId, { status: "error", error: t.events.bulkFailed, title: untitled });
+      }
+    });
   }
 
   function onDrop(e: React.DragEvent) {
@@ -262,9 +292,11 @@ export function BulkImport({
   }
 
   const active = items.filter((it) => !it.skipped);
-  const done = active.filter((it) => it.status === "ready" || it.status === "error").length;
-  const busy = active.some((it) => it.status === "queued" || it.status === "uploading" || it.status === "captioning");
-  const savable = active.filter((it) => it.stagedId && (it.status === "ready" || it.status === "error"));
+  const uploadedCount = active.filter((it) => it.stagedId).length;
+  const captionDone = active.filter((it) => it.status === "ready" || it.status === "error").length;
+  const uploading = active.some((it) => isUploadBusy(it.status));
+  const captioning = active.some((it) => it.status === "captioning" || it.status === "uploaded");
+  const savable = active.filter(isSavableItem);
   const payload = useMemo(
     () =>
       JSON.stringify({
@@ -365,9 +397,14 @@ export function BulkImport({
 
       {active.length > 0 && (
         <p className="text-sm text-ink-700/80">
-          {busy
-            ? interpolate(t.events.bulkProgress, { done, total: active.length })
-            : interpolate(t.events.bulkReady, { count: savable.length })}
+          {uploading
+            ? interpolate(t.events.bulkProgress, { done: uploadedCount, total: active.length })
+            : captioning
+              ? interpolate(t.events.bulkProgressCaption, {
+                  done: captionDone,
+                  total: active.length,
+                })
+              : interpolate(t.events.bulkReady, { count: savable.length })}
         </p>
       )}
 
@@ -377,15 +414,17 @@ export function BulkImport({
           const statusLabel =
             it.status === "uploading"
               ? t.events.bulkUploading
-              : it.status === "captioning"
-                ? t.events.bulkCaptioning
-                : it.status === "queued"
-                  ? t.events.bulkWaiting
-                  : it.status === "error"
-                    ? t.events.bulkFailed
-                    : it.dateFromPhoto
-                      ? t.events.bulkDateFromPhoto
-                      : t.events.bulkDateToday;
+              : it.status === "queued"
+                ? t.events.bulkWaiting
+                : it.status === "captioning"
+                  ? t.events.bulkCaptioning
+                  : it.status === "uploaded"
+                    ? t.events.bulkUploaded
+                    : it.status === "error"
+                      ? t.events.bulkFailed
+                      : it.dateFromPhoto
+                        ? t.events.bulkDateFromPhoto
+                        : t.events.bulkDateToday;
           return (
             <li key={it.localId} className="card flex gap-3 p-3 sm:p-4">
               <div className="h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-black/5">
@@ -401,14 +440,24 @@ export function BulkImport({
                     placeholder={untitled}
                     maxLength={200}
                   />
-                  <input
-                    type="date"
-                    className="input"
-                    value={it.suggestedDate}
-                    onChange={(e) =>
-                      patch(it.localId, { suggestedDate: e.target.value, dateFromPhoto: false })
-                    }
-                  />
+                  <div>
+                    <input
+                      type="date"
+                      lang="en"
+                      className="input"
+                      value={it.suggestedDate}
+                      onChange={(e) =>
+                        patch(it.localId, {
+                          suggestedDate: e.target.value,
+                          dateFromPhoto: false,
+                        })
+                      }
+                    />
+                    <p className="mt-1 text-xs text-ink-700/60">
+                      {formatDate(it.suggestedDate, t.locale as Locale, t)}
+                      {it.dateFromPhoto ? ` · ${t.events.bulkDateFromPhoto}` : ""}
+                    </p>
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <select
@@ -469,7 +518,7 @@ export function BulkImport({
           <SaveButton
             label={interpolate(t.events.bulkSave, { count: savable.length })}
             pendingLabel={t.common.loading}
-            disabled={busy || savable.length === 0}
+            disabled={uploading || savable.length === 0}
           />
           <Link href="/events" className="btn-ghost">
             {t.common.cancel}

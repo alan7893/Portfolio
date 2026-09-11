@@ -32,7 +32,7 @@ export async function getFilterOptions() {
 
   const yearSet = new Set<string>();
   for (const e of years) {
-    yearSet.add(String(e.eventDate.getFullYear()));
+    yearSet.add(String(e.eventDate.getUTCFullYear()));
   }
 
   return {
