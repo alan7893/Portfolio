@@ -11,7 +11,7 @@ import {
 import { mimeFromName } from "@/lib/constants";
 import { checkRateLimit, registerFailedAttempt } from "@/lib/rateLimit";
 import { DEFAULT_LOCALE, normalizeLocale } from "@/lib/i18n";
-import { prepareVisionJpeg, extractPhotoTakenAt } from "@/lib/photo-vision";
+import { prepareVisionJpeg, resolvePhotoTakenAt } from "@/lib/photo-vision";
 import { getPrivacySettings } from "@/lib/privacy.server";
 
 export const runtime = "nodejs";
@@ -53,6 +53,7 @@ export async function POST(request: Request) {
   }
 
   let original: Buffer | null = null;
+  let filename = "";
   const stagedId = collectStagedIds(form)[0];
   if (stagedId) {
     const staged = await readStagedBytes(userId, stagedId);
@@ -69,6 +70,7 @@ export async function POST(request: Request) {
       );
     }
     original = staged.bytes;
+    filename = staged.meta.originalName;
   } else {
     const files = collectUploadedFiles(form, "file");
     const file = files[0];
@@ -87,10 +89,11 @@ export async function POST(request: Request) {
       );
     }
     original = Buffer.from(await file.arrayBuffer());
+    filename = file.name;
   }
 
   const locale = normalizeLocale(String(form.get("locale") ?? DEFAULT_LOCALE));
-  const suggestedDate = await extractPhotoTakenAt(original);
+  const suggestedDate = await resolvePhotoTakenAt(original, filename);
 
   let vision;
   try {

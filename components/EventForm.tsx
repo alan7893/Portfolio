@@ -9,6 +9,7 @@ import { EVENT_TYPES, EVENT_STATUSES, CATEGORIES } from "@/lib/constants";
 import { PHOTO_PURPOSES, PARTICIPATION_ROLES } from "@/lib/hk-portfolio";
 import { FileUploader } from "./FileUploader";
 import { CaptureChecklist } from "./CaptureChecklist";
+import { todayDateOnly } from "@/lib/dates";
 
 type ChildOption = { value: string; label: string };
 
@@ -83,6 +84,7 @@ export function EventForm({
   );
   const [photoPurpose, setPhotoPurpose] = useState(defaults?.photoPurpose ?? "");
   const [rank, setRank] = useState(defaults?.achievementRank ?? "");
+  const [eventDate, setEventDate] = useState(defaults?.eventDate ?? todayDateOnly());
   const [stagedIds, setStagedIds] = useState<string[]>([]);
   const [uploadStatus, setUploadStatus] = useState<
     "idle" | "uploading" | "done" | "error"
@@ -93,6 +95,7 @@ export function EventForm({
   >("idle");
   const [sendToAi, setSendToAi] = useState(captionEnabled);
   const userEditedTitle = useRef(Boolean(defaults?.title));
+  const userEditedDate = useRef(Boolean(defaults?.eventDate));
 
   const showRank =
     eventType === "PRIZE" ||
@@ -124,12 +127,16 @@ export function EventForm({
         const res = await fetch("/api/media/stage", { method: "POST", body });
         const json = (await res.json().catch(() => ({}))) as {
           id?: string;
+          suggestedDate?: string | null;
           error?: string;
         };
         if (!res.ok || !json.id) {
           throw new Error(json.error || "Upload failed");
         }
         nextIds.push(json.id);
+        if (json.suggestedDate && !userEditedDate.current) {
+          setEventDate(json.suggestedDate);
+        }
       }
       setStagedIds(nextIds);
       setUploadStatus("done");
@@ -168,6 +175,7 @@ export function EventForm({
         photoPurpose?: string;
         nameOnEvidence?: boolean;
         childReflection?: string;
+        suggestedDate?: string | null;
         error?: string;
       };
       if (!res.ok) {
@@ -175,6 +183,7 @@ export function EventForm({
         return;
       }
       if (!userEditedTitle.current && json.title) setTitle(json.title);
+      if (json.suggestedDate && !userEditedDate.current) setEventDate(json.suggestedDate);
       if (json.category) setCategory(json.category);
       if (json.description && !description) setDescription(json.description);
       if (json.eventType) setEventType(json.eventType);
@@ -257,9 +266,14 @@ export function EventForm({
           <label className="label">{t.events.date}</label>
           <input
             type="date"
+            lang="en"
             name="eventDate"
             className="input"
-            defaultValue={defaults?.eventDate ?? today()}
+            value={eventDate}
+            onChange={(e) => {
+              userEditedDate.current = true;
+              setEventDate(e.target.value);
+            }}
             required
           />
         </div>
@@ -549,6 +563,3 @@ export function EventForm({
   );
 }
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}

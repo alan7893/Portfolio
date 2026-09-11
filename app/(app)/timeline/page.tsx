@@ -51,8 +51,8 @@ export default async function TimelinePage({
     Map<number, typeof events>
   >();
   for (const e of events) {
-    const y = e.eventDate.getFullYear();
-    const m = e.eventDate.getMonth();
+    const y = e.eventDate.getUTCFullYear();
+    const m = e.eventDate.getUTCMonth();
     if (!groups.has(y)) groups.set(y, new Map());
     const months = groups.get(y)!;
     if (!months.has(m)) months.set(m, []);

@@ -19,6 +19,7 @@ import {
 } from "@/lib/uploads";
 import type { SavedFile } from "@/lib/uploads";
 import { getI18n } from "@/lib/i18n.server";
+import { parseDateOnly } from "@/lib/dates";
 
 async function requireSession() {
   const session = await getServerSession(authOptions);
@@ -30,6 +31,10 @@ async function requireSession() {
 
 function sessionUserId(session: { user?: { id?: string } }): string {
   return session.user?.id ?? "anon";
+}
+
+function calendarDate(raw: string): Date | null {
+  return parseDateOnly(raw);
 }
 
 function readEventForm(formData: FormData) {
@@ -186,13 +191,18 @@ export async function createEventAction(
     return { error: "Child not found. Add a child first." };
   }
 
+  const eventDate = calendarDate(parsed.data.eventDate);
+  if (!eventDate) {
+    return { error: "Pick a valid date." };
+  }
+
   const event = await prisma.event.create({
     data: {
       childId: parsed.data.childId,
       eventType: parsed.data.eventType as never,
       title,
       description: parsed.data.description || null,
-      eventDate: new Date(parsed.data.eventDate),
+      eventDate,
       category: parsed.data.category || null,
       location: parsed.data.location || null,
       achievementRank: parsed.data.achievementRank || null,
@@ -264,8 +274,8 @@ export async function createBulkEventsAction(
   try {
     for (const item of parsed.data.items) {
       const title = item.title?.trim() || untitled;
-      const eventDate = new Date(item.eventDate);
-      if (Number.isNaN(eventDate.getTime())) {
+      const eventDate = calendarDate(item.eventDate);
+      if (!eventDate) {
         throw new Error("A photo is missing a valid date.");
       }
       const event = await prisma.event.create({
@@ -330,13 +340,18 @@ export async function updateEventAction(
     return { error: "Event not found." };
   }
 
+  const eventDate = calendarDate(parsed.data.eventDate);
+  if (!eventDate) {
+    return { error: "Pick a valid date." };
+  }
+
   const event = await prisma.event.update({
     where: { id: eventId },
     data: {
       eventType: parsed.data.eventType as never,
       title: parsed.data.title || existing.title,
       description: parsed.data.description || null,
-      eventDate: new Date(parsed.data.eventDate),
+      eventDate,
       category: parsed.data.category || null,
       location: parsed.data.location || null,
       achievementRank: parsed.data.achievementRank || null,

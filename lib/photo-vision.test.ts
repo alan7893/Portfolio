@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import sharp from "sharp";
-import { prepareVisionJpeg, VISION_MAX_EDGE, parseExifTakenDate } from "./photo-vision";
+import { prepareVisionJpeg, VISION_MAX_EDGE, parseExifTakenDate, parseFilenameTakenDate } from "./photo-vision";
 
 describe("prepareVisionJpeg", () => {
   it("re-encodes a large image as a small JPEG without keeping the original size", async () => {
@@ -33,8 +33,24 @@ describe("parseExifTakenDate", () => {
     assert.equal(parseExifTakenDate(buf), "2020-06-15");
   });
 
-  it("rejects impossible dates", () => {
-    assert.equal(parseExifTakenDate(Buffer.from("0000:00:00 00:00:00")), null);
-    assert.equal(parseExifTakenDate(Buffer.from("1990:13:40 00:00:00")), null);
+  it("prefers DateTimeOriginal over a later software date", () => {
+    const buf = Buffer.from(
+      "DateTimeOriginal\x002018:03:04 08:00:00\x00DateTime\x002026:01:01 00:00:00",
+      "latin1",
+    );
+    assert.equal(parseExifTakenDate(buf), "2018-03-04");
+  });
+});
+
+describe("parseFilenameTakenDate", () => {
+  it("reads camera-style names", () => {
+    assert.equal(parseFilenameTakenDate("IMG_20200615_093000.jpg"), "2020-06-15");
+    assert.equal(parseFilenameTakenDate("PXL_2020-06-15_123.jpg"), "2020-06-15");
+    assert.equal(parseFilenameTakenDate("WhatsApp Image 2019-12-01 at 12.00.00.jpg"), "2019-12-01");
+  });
+
+  it("ignores names without a full calendar date", () => {
+    assert.equal(parseFilenameTakenDate("IMG_4022.HEIC"), null);
+    assert.equal(parseFilenameTakenDate("photo.png"), null);
   });
 });

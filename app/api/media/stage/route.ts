@@ -8,7 +8,7 @@ import {
   mediaWriteErrorMessage,
   readStagedBytes,
 } from "@/lib/uploads";
-import { extractPhotoTakenAt } from "@/lib/photo-vision";
+import { resolvePhotoTakenAt } from "@/lib/photo-vision";
 
 export const runtime = "nodejs";
 
@@ -47,7 +47,9 @@ export async function POST(request: Request) {
     let suggestedDate: string | null = null;
     if (staged.fileType.startsWith("image/")) {
       const packed = await readStagedBytes(userId, staged.id);
-      if (packed) suggestedDate = await extractPhotoTakenAt(packed.bytes);
+      if (packed) {
+        suggestedDate = await resolvePhotoTakenAt(packed.bytes, staged.originalName);
+      }
     }
     return NextResponse.json({
       id: staged.id,
